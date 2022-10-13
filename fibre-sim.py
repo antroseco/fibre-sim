@@ -3,16 +3,16 @@ from scipy.special import erfc
 from matplotlib import pyplot as plt
 
 # BPSK over AWGN channel.
-def simulate_impl(len, N0):
+def simulate_impl(length, N0):
     # Generate random bits.
     rng = np.random.default_rng()
-    bits = rng.integers(low=0, high=1, endpoint=True, size=len)
+    bits = rng.integers(low=0, high=1, endpoint=True, size=length)
 
     # Map bits to symbols (1 -> -1, 0 -> 1).
     symbols = 1 - 2 * bits
 
     # Simulate AWGN. Note that normal() takes the standard deviation.
-    rx_samples = symbols + rng.normal(0, np.sqrt(N0 / 2), size=len)
+    rx_samples = symbols + rng.normal(0, np.sqrt(N0 / 2), size=length)
 
     # Determine received bits.
     rx_bits = rx_samples < 0
