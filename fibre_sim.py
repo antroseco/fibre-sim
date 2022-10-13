@@ -35,14 +35,15 @@ def simulate(len: int, N0: float) -> int:
     return errors
 
 
-eb_n0_db = np.arange(1, 8, 0.5)
-eb_n0 = 10 ** (eb_n0_db / 10)
+if __name__ == "__main__":
+    eb_n0_db = np.arange(1, 8, 0.5)
+    eb_n0 = 10 ** (eb_n0_db / 10)
 
-theoretical_bers = calculate_awgn_ber_with_bpsk(eb_n0)
-bers = [simulate(10**6, 1 / i) / 10**6 for i in eb_n0]
+    theoretical_bers = calculate_awgn_ber_with_bpsk(eb_n0)
+    bers = [simulate(10**6, 1 / i) / 10**6 for i in eb_n0]
 
-print(bers)
+    print(bers)
 
-_, ax = plt.subplots()
-plot_ber(ax, eb_n0_db, (theoretical_bers, bers), ("Theoretical", "Simulation"))
-plt.show()
+    _, ax = plt.subplots()
+    plot_ber(ax, eb_n0_db, (theoretical_bers, bers), ("Theoretical", "Simulation"))
+    plt.show()
