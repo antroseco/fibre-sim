@@ -1,8 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.special import erfc
 
-from utils import plot_ber
+from utils import plot_ber, calculate_awgn_ber_with_bpsk
 
 # BPSK over AWGN channel.
 def simulate_impl(length: int, N0: float) -> int:
@@ -39,7 +38,7 @@ def simulate(len: int, N0: float) -> int:
 eb_n0_db = np.arange(1, 8, 0.5)
 eb_n0 = 10 ** (eb_n0_db / 10)
 
-theoretical_bers = 0.5 * erfc(np.sqrt(eb_n0))
+theoretical_bers = calculate_awgn_ber_with_bpsk(eb_n0)
 bers = [simulate(10**6, 1 / i) / 10**6 for i in eb_n0]
 
 print(bers)

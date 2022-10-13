@@ -1,7 +1,7 @@
+import numpy as np
 import pytest
-from utils import plot_ber
-
 from matplotlib import pyplot as plt
+from utils import plot_ber, calculate_awgn_ber_with_bpsk
 
 
 class TestPlotBer:
@@ -14,3 +14,17 @@ class TestPlotBer:
 
         # This is fine.
         plot_ber(ax, (), ((), ()), ("", ""))
+
+
+class TestCalculateAwgnBerWithBpsk:
+    def test_monotonically_decreasing(self):
+        x = np.linspace(1, 10, 20)
+        y = calculate_awgn_ber_with_bpsk(x)
+
+        assert np.all(np.diff(y) < 0)
+
+    def test_known_values(self):
+        assert np.allclose(
+            calculate_awgn_ber_with_bpsk(np.asarray((4, 9))),
+            (0.00233886749, 0.00001104524),
+        )

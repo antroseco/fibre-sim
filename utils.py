@@ -1,7 +1,9 @@
 from itertools import cycle
 from typing import Iterable, Sequence
 
+import numpy as np
 from matplotlib.axes import Axes
+from scipy.special import erfc
 
 
 def plot_ber(
@@ -21,3 +23,7 @@ def plot_ber(
     ax.set_ylabel("BER")
     ax.set_xlabel("$E_b/N_0$ (dB)")
     ax.legend()
+
+
+def calculate_awgn_ber_with_bpsk(eb_n0: np.ndarray):
+    return 0.5 * erfc(np.sqrt(eb_n0))
