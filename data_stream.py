@@ -49,3 +49,6 @@ class PseudoRandomStream(DataStream):
             np.unpackbits(data) ^ np.unpackbits(self.last_chunk)
         )
         self.symbol_errors += np.count_nonzero(data ^ self.last_chunk)
+
+        # Consume chunk.
+        self.last_chunk = None
