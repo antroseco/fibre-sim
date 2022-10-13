@@ -3,7 +3,7 @@ from scipy.special import erfc
 from matplotlib import pyplot as plt
 
 # BPSK over AWGN channel.
-def simulate_impl(length, N0):
+def simulate_impl(length: int, N0: float) -> int:
     # Generate random bits.
     rng = np.random.default_rng()
     bits = rng.integers(low=0, high=1, endpoint=True, size=length)
@@ -21,7 +21,7 @@ def simulate_impl(length, N0):
     return np.sum(rx_bits ^ bits)
 
 
-def simulate(len, N0):
+def simulate(len: int, N0: float) -> int:
     # Limit our memory usage.
     MAX_LEN = 10_000_000
 
