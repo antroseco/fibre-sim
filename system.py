@@ -15,8 +15,8 @@ def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -
         assert a.output_type == b.input_type
 
 
-def pipe(input: np.ndarray, component: Component) -> np.ndarray:
-    return component(input)
+def pipe(data: np.ndarray, component: Component) -> np.ndarray:
+    return component(data)
 
 
 def build_system(
@@ -31,7 +31,7 @@ def build_system(
             chunk_size = min(symbol_count, MAX_CHUNK_SIZE)
 
             channel_output = reduce(
-                lambda input, component: component(input),
+                pipe,
                 components,
                 data_stream.generate(chunk_size),
             )
