@@ -1,6 +1,11 @@
+from itertools import cycle
+from typing import Iterable, Sequence
+
 import numpy as np
-from scipy.special import erfc
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from scipy.special import erfc
+
 
 # BPSK over AWGN channel.
 def simulate_impl(length: int, N0: float) -> int:
@@ -34,6 +39,25 @@ def simulate(len: int, N0: float) -> int:
     return errors
 
 
+def plot_ber(
+    ax: Axes,
+    eb_n0_db: Iterable[float],
+    bers: Sequence[Iterable[float]],
+    labels: Sequence[str],
+):
+    assert len(bers) == len(labels)
+
+    markers = cycle(("o", "x", "s", "*"))
+
+    for ber, label in zip(bers, labels):
+        ax.plot(eb_n0_db, ber, marker=next(markers), label=label)
+
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("$E_b/N_0$ (dB)")
+    ax.legend()
+
+
 eb_n0_db = np.arange(1, 8, 0.5)
 eb_n0 = 10 ** (eb_n0_db / 10)
 
@@ -42,10 +66,6 @@ bers = [simulate(10**6, 1 / i) / 10**6 for i in eb_n0]
 
 print(bers)
 
-plt.plot(eb_n0_db, theoretical_bers, marker="o", label="Theoretical")
-plt.plot(eb_n0_db, bers, marker="x", label="Simulation")
-plt.yscale("log")
-plt.ylabel("BER")
-plt.xlabel("$E_b/N_0$ (dB)")
-plt.legend()
+_, ax = plt.subplots()
+plot_ber(ax, eb_n0_db, (theoretical_bers, bers), ("Theoretical", "Simulation"))
 plt.show()
