@@ -1,9 +1,19 @@
+from abc import ABC, abstractmethod
 from itertools import cycle
 from typing import Iterable, Sequence
 
 import numpy as np
 from matplotlib.axes import Axes
 from scipy.special import erfc
+
+
+class Component(ABC):
+    input_type = None
+    output_type = None
+
+    @abstractmethod
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        pass
 
 
 def plot_ber(

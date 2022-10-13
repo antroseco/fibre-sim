@@ -1,46 +1,28 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from utils import plot_ber, calculate_awgn_ber_with_bpsk
-
-# BPSK over AWGN channel.
-def simulate_impl(length: int, N0: float) -> int:
-    # Generate random bits.
-    rng = np.random.default_rng()
-    bits = rng.integers(low=0, high=1, endpoint=True, size=length)
-
-    # Map bits to symbols (1 -> -1, 0 -> 1).
-    symbols = 1 - 2 * bits
-
-    # Simulate AWGN. Note that normal() takes the standard deviation.
-    rx_samples = symbols + rng.normal(0, np.sqrt(N0 / 2), size=length)
-
-    # Determine received bits.
-    rx_bits = rx_samples < 0
-
-    # Calculate number of errors.
-    return np.sum(rx_bits ^ bits)
+from channel import AWGN
+from data_stream import PseudoRandomStream
+from modulation import DemodulatorBPSK, ModulatorBPSK
+from system import build_system
+from utils import calculate_awgn_ber_with_bpsk, plot_ber
 
 
-def simulate(len: int, N0: float) -> int:
-    # Limit our memory usage.
-    MAX_LEN = 10_000_000
+def simulate(length: int, N0: float) -> tuple[int, int]:
+    # BPSK over AWGN channel.
+    system = (ModulatorBPSK(), AWGN(N0), DemodulatorBPSK())
 
-    errors = 0
-    while len:
-        chunk_len = min(len, MAX_LEN)
-        errors += simulate_impl(chunk_len, N0)
-        len -= chunk_len
-
-    return errors
+    return build_system(PseudoRandomStream(1), system)(length)
 
 
 if __name__ == "__main__":
+    LENGTH = 10**6
+
     eb_n0_db = np.arange(1, 8, 0.5)
     eb_n0 = 10 ** (eb_n0_db / 10)
 
     theoretical_bers = calculate_awgn_ber_with_bpsk(eb_n0)
-    bers = [simulate(10**6, 1 / i) / 10**6 for i in eb_n0]
+    bers = [simulate(LENGTH, 1 / i)[0] / LENGTH for i in eb_n0]
 
     print(bers)
 
