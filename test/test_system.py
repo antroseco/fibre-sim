@@ -1,8 +1,10 @@
-from data_stream import PseudoRandomStream
-from system import build_system
-from utils import Component
-
 import numpy as np
+import pytest
+from channel import AWGN
+from data_stream import PseudoRandomStream
+from modulation import DemodulatorBPSK, ModulatorBPSK
+from system import build_system
+from utils import Component, calculate_awgn_ber_with_bpsk
 
 
 class Counter(Component):
@@ -60,3 +62,22 @@ class TestSystem:
         # Check that the data has been split in 3.
         assert counter.calls == 3
         assert counter.count == 2 * 10**6 + 1
+
+
+class TestIntegration:
+    @pytest.mark.parametrize("eb_n0", [1, 2, 3])
+    def test_bpsk_over_awgn(self, eb_n0: float):
+        LENGTH = 10**6
+        N0 = 1 / eb_n0
+
+        config = (ModulatorBPSK(), AWGN(N0), DemodulatorBPSK())
+        system = build_system(PseudoRandomStream(1), config)
+
+        bit_errors, symbol_errors = system(LENGTH)
+
+        # With BPSK, each symbol error corresponds to only one bit error.
+        assert bit_errors == symbol_errors
+
+        # Check with the theoretical rate.
+        theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
+        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
