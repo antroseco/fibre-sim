@@ -59,9 +59,6 @@ class ModulatorQPSK(Modulator):
         I = 1 - 2 * (data & 0b01).astype(np.bool8)
         Q = 1j - 2j * (data & 0b10).astype(np.bool8)
 
-        print(I)
-        print(Q)
-
         # Normalize symbol energy.
         return (I + Q) / np.sqrt(2)
 
