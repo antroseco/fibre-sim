@@ -16,7 +16,6 @@ class Modulator(Component):
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
         assert data.ndim == 1
         assert data.dtype == np.bool8
-        # FIXME this needs a test (for QPSK primarily).
         assert data.size % self.bits_per_symbol == 0
 
 

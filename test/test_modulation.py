@@ -107,6 +107,16 @@ class TestModulatorQPSK:
         assert symbols[2] == -1 + 1j
         assert symbols[3] == -1 - 1j
 
+    def test_odd_bit_lengths(self):
+        # Only multiples of 2 are acceptable.
+        assert self.modulator.bits_per_symbol == 2
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(1, dtype=np.bool8))
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(1001, dtype=np.bool8))
+
 
 class TestDemodulatorQPSK:
     demodulator = DemodulatorQPSK()
