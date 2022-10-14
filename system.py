@@ -1,8 +1,6 @@
 from functools import reduce
 from typing import Callable, Sequence
 
-import numpy as np
-
 from data_stream import DataStream
 from utils import Component
 
@@ -13,10 +11,6 @@ def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -
 
     for a, b in zip(components, components[1:]):
         assert a.output_type == b.input_type
-
-
-def pipe(data: np.ndarray, component: Component) -> np.ndarray:
-    return component(data)
 
 
 def build_system(
@@ -31,7 +25,7 @@ def build_system(
             chunk_size = min(symbol_count, MAX_CHUNK_SIZE)
 
             channel_output = reduce(
-                pipe,
+                lambda data, comp: comp(data),
                 components,
                 data_stream.generate(chunk_size),
             )
