@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from modulation import DemodulatorBPSK, ModulatorBPSK
+from modulation import DemodulatorBPSK, DemodulatorQPSK, ModulatorBPSK, ModulatorQPSK
 from system import build_system
 from utils import Component, calculate_awgn_ber_with_bpsk
 
@@ -65,8 +65,9 @@ class TestSystem:
 
 
 class TestIntegration:
+    @staticmethod
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
-    def test_bpsk_over_awgn(self, eb_n0: float):
+    def test_bpsk_over_awgn(eb_n0: float):
         LENGTH = 10**6
         N0 = 1 / eb_n0
 
@@ -81,3 +82,25 @@ class TestIntegration:
         # Check with the theoretical rate.
         theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
         assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+
+    @staticmethod
+    @pytest.mark.parametrize("eb_n0", [1, 2, 3])
+    def test_qpsk_over_awgn(eb_n0: float):
+        LENGTH = 10**6
+        # FIXME: converting between Eb and Es is confusing.
+        es_n0 = eb_n0 * 2
+        N0 = 1 / es_n0
+
+        config = (ModulatorQPSK(), AWGN(N0), DemodulatorQPSK())
+        system = build_system(PseudoRandomStream(1), config)
+
+        bit_errors, symbol_errors = system(LENGTH)
+
+        # With QPSK, we can have more than one bit error per symbol.
+        # TODO: estimate how many more and add bounds to this check.
+        assert bit_errors > symbol_errors
+
+        # Check with the theoretical rate.
+        # QPSK bit error rate is equal to the BPSK bit error rate.
+        theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
+        assert np.isclose(bit_errors / LENGTH / 2, theoretical_ber, rtol=0.05)
