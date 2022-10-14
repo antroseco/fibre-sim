@@ -8,8 +8,8 @@ from utils import Component, calculate_awgn_ber_with_bpsk
 
 
 class Counter(Component):
-    input_type = "u8 data"
-    output_type = "u8 data"
+    input_type = "bits"
+    output_type = "bits"
 
     def __init__(self) -> None:
         super().__init__()
@@ -35,16 +35,15 @@ class TestSystem:
 
     def test_build_system(self):
         counter = Counter()
-        data_stream = PseudoRandomStream(1)
+        data_stream = PseudoRandomStream()
 
         # Test simple data passthrough.
         system = build_system(data_stream, (counter,))
 
-        bit_errors, symbol_errors = system(2)
+        bit_errors = system(2)
 
         # Check that no errors have been reported.
         assert bit_errors == 0
-        assert symbol_errors == 0
 
         # Check that all data has passed through the channel.
         assert counter.calls == 1
@@ -53,11 +52,10 @@ class TestSystem:
         counter.reset()
 
         # Test automatic fragmentation.
-        bit_errors, symbol_errors = system(2 * 10**6 + 1)
+        bit_errors = system(2 * 10**6 + 1)
 
         # Check that no errors have been reported.
         assert bit_errors == 0
-        assert symbol_errors == 0
 
         # Check that the data has been split in 3.
         assert counter.calls == 3
@@ -72,12 +70,9 @@ class TestIntegration:
         N0 = 1 / eb_n0
 
         config = (ModulatorBPSK(), AWGN(N0), DemodulatorBPSK())
-        system = build_system(PseudoRandomStream(1), config)
+        system = build_system(PseudoRandomStream(), config)
 
-        bit_errors, symbol_errors = system(LENGTH)
-
-        # With BPSK, each symbol error corresponds to only one bit error.
-        assert bit_errors == symbol_errors
+        bit_errors = system(LENGTH)
 
         # Check with the theoretical rate.
         theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
@@ -92,15 +87,11 @@ class TestIntegration:
         N0 = 1 / es_n0
 
         config = (ModulatorQPSK(), AWGN(N0), DemodulatorQPSK())
-        system = build_system(PseudoRandomStream(1), config)
+        system = build_system(PseudoRandomStream(), config)
 
-        bit_errors, symbol_errors = system(LENGTH)
-
-        # With QPSK, we can have more than one bit error per symbol.
-        # TODO: estimate how many more and add bounds to this check.
-        assert bit_errors > symbol_errors
+        bit_errors = system(LENGTH)
 
         # Check with the theoretical rate.
         # QPSK bit error rate is equal to the BPSK bit error rate.
         theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
-        assert np.isclose(bit_errors / LENGTH / 2, theoretical_ber, rtol=0.05)
+        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)

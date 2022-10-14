@@ -15,10 +15,10 @@ def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -
 
 def build_system(
     data_stream: DataStream, components: Sequence[Component]
-) -> Callable[[int], tuple[int, int]]:
+) -> Callable[[int], int]:
     typecheck_system(data_stream, components)
 
-    def simulate_system(symbol_count: int) -> tuple[int, int]:
+    def simulate_system(symbol_count: int) -> int:
         MAX_CHUNK_SIZE = 10**6
 
         while symbol_count:
@@ -33,6 +33,6 @@ def build_system(
 
             symbol_count -= chunk_size
 
-        return data_stream.bit_errors, data_stream.symbol_errors
+        return data_stream.bit_errors
 
     return simulate_system

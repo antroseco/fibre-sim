@@ -11,30 +11,16 @@ def calculate_entropy(data: np.ndarray) -> float:
 
 
 class TestPseudoRandomStream:
-    @staticmethod
-    def test_init_bounds_checking():
-        # Negative bits per symbol don't make sense.
-        with pytest.raises(Exception):
-            PseudoRandomStream(-1)
-        # Neither do 0.
-        with pytest.raises(Exception):
-            PseudoRandomStream(0)
-        # We use a uint8, so we are limited to 8 bits.
-        with pytest.raises(Exception):
-            PseudoRandomStream(9)
+    stream = PseudoRandomStream()
 
-        # Anything between 1 and 8 bits per symbol should be fine.
-        PseudoRandomStream(1)
-        PseudoRandomStream(8)
-
-    @staticmethod
-    @pytest.mark.parametrize("bits", [1, 4, 8])
-    def test_generate(bits):
+    def test_generate(self):
         LENGTH = 4096
-        stream = PseudoRandomStream(bits)
 
-        first = stream.generate(LENGTH)
-        second = stream.generate(LENGTH)
+        first = self.stream.generate(LENGTH)
+        second = self.stream.generate(LENGTH)
+
+        # Check dtype.
+        assert first.dtype == second.dtype == np.bool8
 
         # Check that it respects the length argument.
         assert first.size == second.size == LENGTH
@@ -42,41 +28,34 @@ class TestPseudoRandomStream:
         # Different blocks should virtually never be the same.
         assert np.any(first != second)
 
-        # Check minimum and maximum values generated.
-        assert first.min() >= 0
-        assert first.max() <= 2**bits - 1
-
         # Verify entropy.
-        assert np.isclose(calculate_entropy(first), bits, atol=0.1)
+        assert calculate_entropy(first) > 0.99
+        assert calculate_entropy(second) > 0.99
 
-    @staticmethod
-    def test_validate():
+    def test_validate(self):
         LENGTH = 8
-        stream = PseudoRandomStream(2)
 
         # validate() should throw if it's called before generate().
         with pytest.raises(Exception):
-            stream.validate(np.zeros(LENGTH))
+            self.stream.validate(np.zeros(LENGTH, dtype=np.bool8))
 
         # Now it should be fine; and it should report zero errors.
-        data = stream.generate(LENGTH)
-        stream.validate(data)
+        data = self.stream.generate(LENGTH)
+        self.stream.validate(data)
 
-        assert stream.bit_errors == 0
-        assert stream.symbol_errors == 0
+        assert self.stream.bit_errors == 0
 
         # It should throw if validate() is called consecutively.
         with pytest.raises(Exception):
-            stream.validate(data)
+            self.stream.validate(data)
 
         # It should also throw if the lengths don't match.
-        stream.generate(LENGTH)
+        self.stream.generate(LENGTH)
         with pytest.raises(Exception):
-            stream.validate(np.zeros(2 * LENGTH))
+            self.stream.validate(np.zeros(2 * LENGTH, dtype=np.bool8))
 
         # Finally test if errors are counted correctly.
-        stream.last_chunk = np.zeros(4, dtype=np.uint8)
-        stream.validate(np.asarray((0, 0, 1, 3), dtype=np.uint8))
+        self.stream.last_chunk = np.zeros(4, dtype=np.bool8)
+        self.stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool8))
 
-        assert stream.bit_errors == 3
-        assert stream.symbol_errors == 2
+        assert self.stream.bit_errors == 2

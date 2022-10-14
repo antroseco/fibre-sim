@@ -1,54 +1,47 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 class DataStream(ABC):
-    input_type = "u8 data"
-    output_type = "u8 data"
+    input_type = "bits"
+    output_type = "bits"
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.bit_errors = 0
-        self.symbol_errors = 0
+        self.bit_errors: int = 0
 
     @abstractmethod
-    def generate(self, length: int) -> np.ndarray:
+    def generate(self, length: int) -> NDArray[np.bool8]:
         pass
 
     @abstractmethod
-    def validate(self, data: np.ndarray) -> int:
+    def validate(self, data: NDArray[np.bool8]) -> int:
         pass
 
 
 class PseudoRandomStream(DataStream):
-    def __init__(self, bits_per_symbol: int) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        assert bits_per_symbol > 0
-        assert 2**bits_per_symbol <= np.iinfo(np.uint8).max + 1
-
-        self.bits_per_symbol = bits_per_symbol
-
-        self.last_chunk = None
+        self.last_chunk: Optional[NDArray[np.bool8]] = None
         self.rng = np.random.default_rng()
 
-    def generate(self, length: int) -> np.ndarray:
+    def generate(self, length: int) -> NDArray[np.bool8]:
         self.last_chunk = self.rng.integers(
-            0, 2**self.bits_per_symbol, length, dtype=np.uint8
+            0, 1, endpoint=True, size=length, dtype=np.bool8
         )
 
         return self.last_chunk
 
-    def validate(self, data: np.ndarray) -> None:
+    def validate(self, data: NDArray[np.bool8]) -> None:
         assert self.last_chunk is not None
         assert data.size == self.last_chunk.size
 
-        self.bit_errors += np.count_nonzero(
-            np.unpackbits(data) ^ np.unpackbits(self.last_chunk)
-        )
-        self.symbol_errors += np.count_nonzero(data ^ self.last_chunk)
+        self.bit_errors += np.sum(data ^ self.last_chunk)
 
-        # Consume chunk.
+        # Prevent the last chunk from being reused accidentally.
         self.last_chunk = None
