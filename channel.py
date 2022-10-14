@@ -25,5 +25,6 @@ class AWGN(Channel):
         super().__call__(symbols)
 
         # normal() takes the standard deviation.
-        noise = self.rng.normal(0, np.sqrt(self.N0 / 2), size=symbols.size)
-        return symbols + noise
+        noise_r = self.rng.normal(0, np.sqrt(self.N0 / 2), size=symbols.size)
+        noise_i = self.rng.normal(0, np.sqrt(self.N0 / 2), size=symbols.size)
+        return symbols + noise_r + noise_i * 1j

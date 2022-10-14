@@ -4,7 +4,7 @@ from channel import AWGN
 
 
 class TestAWGN:
-    test_data = np.arange(1000)
+    test_data = np.arange(1000) + 2j
 
     def test_preserves_length(self):
         awgn = AWGN(1)
@@ -16,7 +16,8 @@ class TestAWGN:
 
         noisy_data = awgn(self.test_data)
 
-        assert np.all(noisy_data != self.test_data)
+        assert np.all(np.real(noisy_data) != np.real(self.test_data))
+        assert np.all(np.imag(noisy_data) != np.imag(self.test_data))
         assert np.isfinite(noisy_data).all()
 
     @pytest.mark.parametrize("N0", [1, 2, 3])
@@ -24,7 +25,11 @@ class TestAWGN:
         awgn = AWGN(N0)
 
         noise = awgn(self.test_data) - self.test_data
+        noise_r = np.real(noise)
+        noise_i = np.imag(noise)
 
         # Noise must have mean 0 and variance N0 / 2.
-        assert np.isclose(noise.mean(), 0, atol=0.2)
-        assert np.isclose(noise.var(), N0 / 2, atol=0.2)
+        assert np.isclose(noise_r.mean(), 0, atol=0.2)
+        assert np.isclose(noise_r.var(), N0 / 2, atol=0.2)
+        assert np.isclose(noise_i.mean(), 0, atol=0.2)
+        assert np.isclose(noise_i.var(), N0 / 2, atol=0.2)
