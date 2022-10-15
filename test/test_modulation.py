@@ -14,7 +14,7 @@ from modulation import (
 from numpy.typing import NDArray
 
 
-def array_to_bits(array: NDArray) -> NDArray[np.bool8]:
+def ints_to_bits(array: NDArray) -> NDArray[np.bool8]:
     assert array.ndim == 1
 
     # Determine how many bits are required to represent all values.
@@ -79,7 +79,7 @@ class TestModulatorBPSK:
     modulator = ModulatorBPSK()
 
     def test_mapping(self):
-        data = array_to_bits(np.arange(2))
+        data = ints_to_bits(np.arange(2))
         symbols = self.modulator(data)
 
         # Check dtype.
@@ -135,7 +135,7 @@ class TestModulatorQPSK:
     modulator = ModulatorQPSK()
 
     def test_mapping(self):
-        data = array_to_bits(np.arange(4))
+        data = ints_to_bits(np.arange(4))
         symbols = self.modulator(data)
 
         # Check dtype.
@@ -221,7 +221,7 @@ class TestModulator16QAM:
         assert offsets[3] == 2
 
     def test_mapping(self):
-        data = array_to_bits(np.arange(16))
+        data = ints_to_bits(np.arange(16))
         symbols = self.modulator(data)
 
         # Check dtype.
