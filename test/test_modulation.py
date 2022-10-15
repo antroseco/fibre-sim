@@ -1,8 +1,10 @@
+from itertools import product
 from math import floor
 
 import numpy as np
 import pytest
 from modulation import (
+    Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
     Modulator16QAM,
@@ -134,10 +136,11 @@ class TestDemodulatorQPSK:
         # Check dtype.
         assert data.dtype == np.bool8
 
-        # Length should be halved (2 bits per symbol).
+        # Length should have doubled (2 bits per symbol).
         assert 2 * symbols.size == data.size
 
         # Check that symbols have been demodulated correctly.
+        # FIXME bitorder is wrong.
         ints = np.packbits(np.reshape(data, (4, 2)), axis=1, bitorder="little")
         assert ints[0] == 0b00
         assert ints[1] == 0b01
@@ -192,8 +195,6 @@ class TestModulator16QAM:
         # Un-normalize energy to make the comparisons below easier.
         symbols *= np.sqrt(10)
 
-        print(symbols)
-
         # Check constellation (diagram in the class definition).
         assert symbols[0] == -3 + 3j
         assert symbols[1] == -1 + 3j
@@ -227,3 +228,63 @@ class TestModulator16QAM:
 
         with pytest.raises(Exception):
             self.modulator(np.zeros(1001, dtype=np.bool8))
+
+
+class TestDemodulator16QAM:
+    demodulator = Demodulator16QAM()
+
+    def test_demodulator(self):
+        # Enumerates the entire constellation column-by-column, starting with
+        # leftmost column (in-phase = -3) and moving from bottom to top
+        # (quadrature from -3 to +3).
+        # FIXME replace magic number.
+        symbol_basis = (-3, -1, 1, 3)
+        symbols = np.fromiter(
+            map(lambda r_i: r_i[0] + r_i[1] * 1j, product(symbol_basis, symbol_basis)),
+            dtype=np.cdouble,
+        ) / np.sqrt(10)
+
+        data = self.demodulator(symbols)
+
+        # Check dtype.
+        assert data.dtype == np.bool8
+
+        # Length should have quadrupled (4 bits per symbol).
+        assert 4 * symbols.size == data.size
+
+        # Check that symbols have been demodulated correctly.
+        ints = np.packbits(
+            np.fliplr(np.reshape(data, (16, 4))), axis=1, bitorder="little"
+        )
+        assert ints[0] == 0b1000
+        assert ints[1] == 0b1100
+        assert ints[2] == 0b0100
+        assert ints[3] == 0b0000
+        assert ints[4] == 0b1001
+        assert ints[5] == 0b1101
+        assert ints[6] == 0b0101
+        assert ints[7] == 0b0001
+        assert ints[8] == 0b1011
+        assert ints[9] == 0b1111
+        assert ints[10] == 0b0111
+        assert ints[11] == 0b0011
+        assert ints[12] == 0b1010
+        assert ints[13] == 0b1110
+        assert ints[14] == 0b0110
+        assert ints[15] == 0b0010
+
+    def test_combined(self):
+        modulator = Modulator16QAM()
+        rng = np.random.default_rng()
+
+        BIT_LENGTH = 1024
+        SYM_LENGTH = BIT_LENGTH // modulator.bits_per_symbol
+
+        # Modulation should be reversible.
+        data = rng.integers(0, 1, endpoint=True, size=BIT_LENGTH, dtype=np.bool8)
+        assert np.all(self.demodulator(modulator(data)) == data)
+
+        # Small amounts of noise should not introduce any errors.
+        noise_r = rng.uniform(-0.3, 0.3, size=SYM_LENGTH)
+        noise_i = rng.uniform(-0.3, 0.3, size=SYM_LENGTH) * 1j
+        assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)
