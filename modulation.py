@@ -57,6 +57,7 @@ class ModulatorQPSK(Modulator):
         super().__call__(data)
 
         # Constellation has 4 symbols. Adjacent symbols only vary by 1 bit.
+        #
         #         Q
         #   10    |    00
         #         |
@@ -97,7 +98,18 @@ class Modulator16QAM(Modulator):
         assert msbs.size == lsbs.size
         assert msbs.ndim == lsbs.ndim == 1
 
-        # TODO explanation
+        # Looking at the two LSBs of the constellation symbols, we can see that
+        # they completly determine the in-phase component. Looking at the two
+        # MSBs, we can see that they determine the quadrature component. As they
+        # follow they same Gray code each time (00 -> 01 -> 11 -> 10), we only
+        # need to look at two bits at a time to determine each component.
+        #
+        # 3 boolean expressions are needed to determine each component, where
+        # the msbs and lsbs below refer to the MSB and LSB in each pair of bits.
+        # The first expression covers [01, 11, 10], the second [11, 10], and the
+        # third [10] only. Hence, each bit pattern may match multiple
+        # expressions. This should be considerably faster than matching one
+        # expression for each pattern and then multiplying by e.g. 3.
         offsets = np.zeros_like(msbs, dtype=np.float64)
         offsets += msbs | lsbs
         offsets += msbs
@@ -108,9 +120,30 @@ class Modulator16QAM(Modulator):
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
         super().__call__(data)
 
-        # TODO Constellation diagram.
+        # Constellation has 16 symbols. Adjacent symbols only vary by 1 bit.
+        # 0111 is at (1, 1) and 0010 is at (3, 3).
+        #
+        #              Q
+        #   0000  0001 | 0011  0010
+        #              |
+        #              |
+        #   0100  0101 | 0111  0110
+        #              |
+        #   ------------------------I
+        #              |
+        #   1100  1101 | 1111  1110
+        #              |
+        #              |
+        #   1000  1001 | 1011  1010
+        #              |
+        #
+        # In-phase component carries the 2 LSBs.
         I = -3 + 2 * self.impl(data[2::4], data[3::4])
+        # Quadrature component carries the 2 MSBs.
         Q = 3j - 2j * self.impl(data[0::4], data[1::4])
 
-        # Normalize symbol energy. TODO explanation.
+        # Normalize symbol energy. The mean energy of the constellation is
+        # defined as the expected value of |a+bj|^2. With a uniform
+        # distribution over all symbols, this comes out to 10. Thus, we need to
+        # divide the *amplitude* by the square root of 10.
         return (I + Q) / np.sqrt(10)
