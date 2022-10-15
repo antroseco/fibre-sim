@@ -2,7 +2,13 @@ from math import floor
 
 import numpy as np
 import pytest
-from modulation import DemodulatorBPSK, DemodulatorQPSK, ModulatorBPSK, ModulatorQPSK
+from modulation import (
+    DemodulatorBPSK,
+    DemodulatorQPSK,
+    Modulator16QAM,
+    ModulatorBPSK,
+    ModulatorQPSK,
+)
 from numpy.typing import NDArray
 
 
@@ -153,3 +159,71 @@ class TestDemodulatorQPSK:
         noise_r = rng.uniform(-0.5, 0.5, size=SYM_LENGTH)
         noise_i = rng.uniform(-0.5, 0.5, size=SYM_LENGTH) * 1j
         assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)
+
+
+class TestModulator16QAM:
+    modulator = Modulator16QAM()
+
+    def test_impl(self):
+        msbs = np.asarray((0, 0, 1, 1), dtype=np.bool8)
+        lsbs = np.asarray((0, 1, 0, 1), dtype=np.bool8)
+
+        offsets = self.modulator.impl(msbs, lsbs)
+
+        # TODO explanation.
+        assert offsets[0] == 0
+        assert offsets[1] == 1
+        assert offsets[2] == 3
+        assert offsets[3] == 2
+
+    def test_mapping(self):
+        data = array_to_bits(np.arange(16))
+        symbols = self.modulator(data)
+
+        # Check dtype.
+        assert symbols.dtype == np.cdouble
+
+        # Length should be a quarter (4 bits per symbol).
+        assert data.size == 4 * symbols.size
+
+        # Mean energy should be 1, although not all symbols have unit energy.
+        assert np.isclose(np.mean(np.abs(symbols) ** 2), 1)
+
+        # Un-normalize energy to make the comparisons below easier.
+        symbols *= np.sqrt(10)
+
+        print(symbols)
+
+        # Check constellation (diagram in the class definition).
+        assert symbols[0] == -3 + 3j
+        assert symbols[1] == -1 + 3j
+        assert symbols[2] == 3 + 3j
+        assert symbols[3] == 1 + 3j
+        assert symbols[4] == -3 + 1j
+        assert symbols[5] == -1 + 1j
+        assert symbols[6] == 3 + 1j
+        assert symbols[7] == 1 + 1j
+        assert symbols[8] == -3 - 3j
+        assert symbols[9] == -1 - 3j
+        assert symbols[10] == 3 - 3j
+        assert symbols[11] == 1 - 3j
+        assert symbols[12] == -3 - 1j
+        assert symbols[13] == -1 - 1j
+        assert symbols[14] == 3 - 1j
+        assert symbols[15] == 1 - 1j
+
+    def test_odd_bit_lengths(self):
+        # Only multiples of 4 are acceptable.
+        assert self.modulator.bits_per_symbol == 4
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(1, dtype=np.bool8))
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(2, dtype=np.bool8))
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(3, dtype=np.bool8))
+
+        with pytest.raises(Exception):
+            self.modulator(np.zeros(1001, dtype=np.bool8))

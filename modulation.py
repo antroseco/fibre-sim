@@ -87,3 +87,30 @@ class DemodulatorQPSK(Demodulator):
         data[1::2] = lsb
 
         return data
+
+
+class Modulator16QAM(Modulator):
+    bits_per_symbol = 4
+
+    @staticmethod
+    def impl(msbs: NDArray[np.bool8], lsbs: NDArray[np.bool8]) -> NDArray[np.float64]:
+        assert msbs.size == lsbs.size
+        assert msbs.ndim == lsbs.ndim == 1
+
+        # TODO explanation
+        offsets = np.zeros_like(msbs, dtype=np.float64)
+        offsets += msbs | lsbs
+        offsets += msbs
+        offsets += msbs & ~lsbs
+
+        return offsets
+
+    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
+        super().__call__(data)
+
+        # TODO Constellation diagram.
+        I = -3 + 2 * self.impl(data[2::4], data[3::4])
+        Q = 3j - 2j * self.impl(data[0::4], data[1::4])
+
+        # Normalize symbol energy. TODO explanation.
+        return (I + Q) / np.sqrt(10)
