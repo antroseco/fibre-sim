@@ -34,6 +34,47 @@ def array_to_bits(array: NDArray) -> NDArray[np.bool8]:
     return np.fliplr(array).ravel().astype(np.bool8)
 
 
+def bits_to_ints(bits: NDArray[np.bool8], bits_per_int: int) -> NDArray[np.uint8]:
+    assert bits_per_int > 0
+    assert bits.ndim == 1
+    assert bits.size >= bits_per_int
+    assert bits.size % bits_per_int == 0
+
+    # The bits of each int must be in a different row, otherwise packbits() will
+    # pack them all together.
+    bits = np.reshape(bits, (bits.size // bits_per_int, bits_per_int))
+
+    # packbits() pads bit counts less than 8 by adding zero bits at the end.
+    # This means that [1, 1, 0, 0] will be interpreted as 0b1100000 instead of
+    # 0b00001100. We can use bitorder="little" to ensure that the padded zero
+    # bits at the end are the MSBs, but then we have to flip the bit order, such
+    # that we pass in [0, 0, 1, 1] instead.
+    bits = np.fliplr(bits)
+
+    return np.packbits(bits, axis=1, bitorder="little").ravel()
+
+
+def test_bits_to_ints():
+    bits = np.asarray((True, False, True, False))
+
+    # Test that bits are interpreted correctly (first one is MSB).
+    assert np.all(bits_to_ints(bits, 1) == [1, 0, 1, 0])
+    assert np.all(bits_to_ints(bits, 2) == [2, 2])
+    assert np.all(bits_to_ints(bits, 4) == [10])
+
+    # Size of bits must be a multiple of bits_per_int.
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 0)
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 3)
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 5)
+
+    # bits can't be empty.
+    with pytest.raises(Exception):
+        bits_to_ints(np.asarray((), dtype=np.bool8), 2)
+
+
 class TestModulatorBPSK:
     modulator = ModulatorBPSK()
 
@@ -253,9 +294,7 @@ class TestDemodulator16QAM:
         assert 4 * symbols.size == data.size
 
         # Check that symbols have been demodulated correctly.
-        ints = np.packbits(
-            np.fliplr(np.reshape(data, (16, 4))), axis=1, bitorder="little"
-        )
+        ints = bits_to_ints(data, self.demodulator.bits_per_symbol)
         assert ints[0] == 0b1000
         assert ints[1] == 0b1100
         assert ints[2] == 0b0100
