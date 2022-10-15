@@ -190,11 +190,10 @@ class TestDemodulatorQPSK:
         assert 2 * symbols.size == data.size
 
         # Check that symbols have been demodulated correctly.
-        # FIXME bitorder is wrong.
-        ints = np.packbits(np.reshape(data, (4, 2)), axis=1, bitorder="little")
+        ints = bits_to_ints(data, self.demodulator.bits_per_symbol)
         assert ints[0] == 0b00
-        assert ints[1] == 0b01
-        assert ints[2] == 0b10
+        assert ints[1] == 0b10
+        assert ints[2] == 0b01
         assert ints[3] == 0b11
 
     def test_combined(self):
