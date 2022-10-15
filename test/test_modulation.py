@@ -34,6 +34,15 @@ def ints_to_bits(array: NDArray) -> NDArray[np.bool8]:
     return np.fliplr(array).ravel().astype(np.bool8)
 
 
+def test_ints_to_bits():
+    # Test that bits are returned in the correct order (MSB first).
+    assert np.all(ints_to_bits(np.asarray((6,))) == [True, True, False])
+
+    # Test automatic width detection
+    assert np.all(ints_to_bits(np.asarray((2, 1))) == [True, False, False, True])
+    assert np.all(ints_to_bits(np.asarray((0, 1))) == [False, True])
+
+
 def bits_to_ints(bits: NDArray[np.bool8], bits_per_int: int) -> NDArray[np.uint8]:
     assert bits_per_int > 0
     assert bits.ndim == 1
