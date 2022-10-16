@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -12,25 +14,45 @@ from modulation import (
     ModulatorQPSK,
 )
 from system import build_system
-from utils import calculate_awgn_ber_with_bpsk, calculate_awgn_ser_with_qam, plot_ber
+from utils import (
+    Component,
+    calculate_awgn_ber_with_bpsk,
+    calculate_awgn_ser_with_qam,
+    plot_ber,
+)
 
 
-def simulate_bpsk(length: int, N0: float) -> int:
+def calculate_n0(eb_n0: float, bits_per_symbol: int) -> float:
+    # Energy per symbol.
+    es_n0 = eb_n0 * bits_per_symbol
+
+    # Each symbol has unit energy, so N0 is just the reciprocal.
+    return 1 / es_n0
+
+
+def simulate_impl(system: Sequence[Component], length: int) -> float:
+    return build_system(PseudoRandomStream(), system)(length) / length
+
+
+def simulate_bpsk(length: int, eb_n0: float) -> float:
     # BPSK over AWGN channel.
+    N0 = calculate_n0(eb_n0, 1)
     system = (ModulatorBPSK(), AWGN(N0), DemodulatorBPSK())
-    return build_system(PseudoRandomStream(), system)(length)
+    return simulate_impl(system, length)
 
 
-def simulate_qpsk(length: int, N0: float) -> int:
+def simulate_qpsk(length: int, eb_n0: float) -> float:
     # QPSK over AWGN channel.
-    system = (ModulatorQPSK(), AWGN(N0 / 2), DemodulatorQPSK())
-    return build_system(PseudoRandomStream(), system)(length)
+    N0 = calculate_n0(eb_n0, 2)
+    system = (ModulatorQPSK(), AWGN(N0), DemodulatorQPSK())
+    return simulate_impl(system, length)
 
 
-def simulate_16qam(length: int, N0: float) -> int:
+def simulate_16qam(length: int, eb_n0: float) -> float:
     # 16-QAM over AWGN channel.
-    system = (Modulator16QAM(), AWGN(N0 / 4), Demodulator16QAM())
-    return build_system(PseudoRandomStream(), system)(length)
+    N0 = calculate_n0(eb_n0, 4)
+    system = (Modulator16QAM(), AWGN(N0), Demodulator16QAM())
+    return simulate_impl(system, length)
 
 
 if __name__ == "__main__":
@@ -42,9 +64,9 @@ if __name__ == "__main__":
     th_ber_psk = calculate_awgn_ber_with_bpsk(eb_n0)
     # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
     th_ber_16qam = calculate_awgn_ser_with_qam(16, eb_n0) / 4
-    ber_bpsk = [simulate_bpsk(LENGTH, 1 / i) / LENGTH for i in eb_n0]
-    ber_qpsk = [simulate_qpsk(LENGTH, 1 / i) / LENGTH for i in eb_n0]
-    ber_16qam = [simulate_16qam(LENGTH, 1 / i) / LENGTH for i in eb_n0]
+    ber_bpsk = [simulate_bpsk(LENGTH, i) for i in eb_n0]
+    ber_qpsk = [simulate_qpsk(LENGTH, i) for i in eb_n0]
+    ber_16qam = [simulate_16qam(LENGTH, i) for i in eb_n0]
 
     _, ax = plt.subplots()
     plot_ber(
