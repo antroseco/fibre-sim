@@ -2,10 +2,17 @@ import numpy as np
 import pytest
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from modulation import DemodulatorBPSK, DemodulatorQPSK, ModulatorBPSK, ModulatorQPSK
+from modulation import (
+    Demodulator16QAM,
+    DemodulatorBPSK,
+    DemodulatorQPSK,
+    Modulator16QAM,
+    ModulatorBPSK,
+    ModulatorQPSK,
+)
 from numpy.typing import NDArray
 from system import build_system
-from utils import Component, calculate_awgn_ber_with_bpsk
+from utils import Component, calculate_awgn_ber_with_bpsk, calculate_awgn_ser_with_qam
 
 
 class Counter(Component):
@@ -128,3 +135,23 @@ class TestIntegration:
 
         # All symbols should have unit energy.
         assert np.isclose(self.energy_sensor.mean, 1)
+
+    @pytest.mark.parametrize("eb_n0", [1, 2, 3])
+    def test_16qam_over_awgn(self, eb_n0: float):
+        LENGTH = 10**6
+        # FIXME: converting between Eb and Es is confusing.
+        es_n0 = eb_n0 * 4
+        N0 = 1 / es_n0
+
+        config = (Modulator16QAM(), self.energy_sensor, AWGN(N0), Demodulator16QAM())
+        system = build_system(PseudoRandomStream(), config)
+
+        bit_errors = system(LENGTH)
+
+        # Check with the theoretical rate.
+        theoretical_ser = calculate_awgn_ser_with_qam(16, np.asarray(eb_n0))
+        theoretical_ber = theoretical_ser / 4
+        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+
+        # All symbols should have unit energy.
+        assert np.isclose(self.energy_sensor.mean, 1, atol=1e-3)
