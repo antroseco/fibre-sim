@@ -1,7 +1,9 @@
-from typing import Sequence
+from itertools import cycle
+from typing import Callable, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
@@ -18,7 +20,6 @@ from utils import (
     Component,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
-    plot_ber,
 )
 
 
@@ -28,6 +29,10 @@ def calculate_n0(eb_n0: float, bits_per_symbol: int) -> float:
 
     # Each symbol has unit energy, so N0 is just the reciprocal.
     return 1 / es_n0
+
+
+def energy_db_to_lin(db):
+    return 10 ** (db / 10)
 
 
 def simulate_impl(system: Sequence[Component], length: int) -> float:
@@ -55,31 +60,61 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     return simulate_impl(system, length)
 
 
-if __name__ == "__main__":
-    LENGTH = 10**6
+def run_simulation(
+    ax: Axes, target_ber: float, simulation: Callable[[int, float], float], **kwargs
+) -> None:
+    MAX_LENGTH = 10**6
+    MAX_EB_N0_DB = 12
 
-    eb_n0_db = np.arange(1, 8, 0.5)
-    eb_n0 = 10 ** (eb_n0_db / 10)
+    bers: list[float] = []
+
+    for eb_n0_db in range(1, MAX_EB_N0_DB + 1):
+        eb_n0 = energy_db_to_lin(eb_n0_db)
+        length = (
+            # Magic heuristic that estimates how many samples we need to get a
+            # decent BER estimate. Takes care to round the result to the next
+            # lowest multiple of 16.
+            min(int(4000 / bers[-1]) & ~0b111, MAX_LENGTH)
+            if bers
+            else MAX_LENGTH // 10
+        )
+
+        bers.append(simulation(length, eb_n0))
+
+        if bers[-1] < target_ber:
+            break
+
+    ax.plot(range(1, len(bers) + 1), bers, alpha=0.6, **kwargs)
+
+
+if __name__ == "__main__":
+    TARGET_BER = 10**-3
+
+    eb_n0_db = np.linspace(1, 12, 100)
+    eb_n0 = energy_db_to_lin(eb_n0_db)
 
     th_ber_psk = calculate_awgn_ber_with_bpsk(eb_n0)
     # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
     th_ber_16qam = calculate_awgn_ser_with_qam(16, eb_n0) / 4
-    ber_bpsk = [simulate_bpsk(LENGTH, i) for i in eb_n0]
-    ber_qpsk = [simulate_qpsk(LENGTH, i) for i in eb_n0]
-    ber_16qam = [simulate_16qam(LENGTH, i) for i in eb_n0]
 
     _, ax = plt.subplots()
-    plot_ber(
-        ax,
-        eb_n0_db,
-        (th_ber_psk, ber_bpsk, ber_qpsk, th_ber_16qam, ber_16qam),
-        (
-            "Theoretical BPSK/QPSK",
-            "Simulated BPSK",
-            "Simulated QPSK",
-            "Theoretical 16-QAM",
-            "Simulated 16-QAM",
-        ),
-    )
+
+    ax.plot(eb_n0_db, th_ber_psk, alpha=0.2, linewidth=5, label="Theoretical BPSK/QPSK")
+    ax.plot(eb_n0_db, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical 16-QAM")
+
+    markers = cycle(("o", "x", "s", "*"))
+
+    for simulation, label in (
+        (simulate_bpsk, "Simulated BPSK"),
+        (simulate_qpsk, "Simulated QPSK"),
+        (simulate_16qam, "Simulated 16-QAM"),
+    ):
+        run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))
+
+    ax.set_ylim(TARGET_BER / 4)
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("$E_b/N_0$ (dB)")
+    ax.legend()
 
     plt.show()
