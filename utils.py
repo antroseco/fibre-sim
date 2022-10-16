@@ -25,3 +25,11 @@ def calculate_awgn_ser_with_qam(
 
     # Equation 2.16 in Digital Coherent Optical Systems.
     return 2 * (1 - 1 / np.sqrt(M)) * erfc(np.sqrt(3 * es_n0 / (2 * (M - 1))))
+
+
+def calculate_n0(eb_n0: float, bits_per_symbol: int) -> float:
+    # Energy per symbol.
+    es_n0 = eb_n0 * bits_per_symbol
+
+    # Each symbol has unit energy, so N0 is just the reciprocal.
+    return 1 / es_n0

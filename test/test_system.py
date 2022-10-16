@@ -12,7 +12,12 @@ from modulation import (
 )
 from numpy.typing import NDArray
 from system import build_system
-from utils import Component, calculate_awgn_ber_with_bpsk, calculate_awgn_ser_with_qam
+from utils import (
+    Component,
+    calculate_awgn_ber_with_bpsk,
+    calculate_awgn_ser_with_qam,
+    calculate_n0,
+)
 
 
 class Counter(Component):
@@ -102,7 +107,7 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_bpsk_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        N0 = 1 / eb_n0
+        N0 = calculate_n0(eb_n0, ModulatorBPSK.bits_per_symbol)
 
         config = (ModulatorBPSK(), self.energy_sensor, AWGN(N0), DemodulatorBPSK())
         system = build_system(PseudoRandomStream(), config)
@@ -119,9 +124,7 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_qpsk_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        # FIXME: converting between Eb and Es is confusing.
-        es_n0 = eb_n0 * 2
-        N0 = 1 / es_n0
+        N0 = calculate_n0(eb_n0, ModulatorQPSK.bits_per_symbol)
 
         config = (ModulatorQPSK(), self.energy_sensor, AWGN(N0), DemodulatorQPSK())
         system = build_system(PseudoRandomStream(), config)
@@ -139,9 +142,7 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_16qam_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        # FIXME: converting between Eb and Es is confusing.
-        es_n0 = eb_n0 * 4
-        N0 = 1 / es_n0
+        N0 = calculate_n0(eb_n0, Modulator16QAM.bits_per_symbol)
 
         config = (Modulator16QAM(), self.energy_sensor, AWGN(N0), Demodulator16QAM())
         system = build_system(PseudoRandomStream(), config)
