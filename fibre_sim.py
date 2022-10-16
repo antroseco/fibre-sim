@@ -74,8 +74,8 @@ def run_simulation(
         length = (
             # Magic heuristic that estimates how many samples we need to get a
             # decent BER estimate. Takes care to round the result to the next
-            # lowest multiple of 16.
-            min(int(4000 / bers[-1]) & ~0b111, MAX_LENGTH)
+            # lowest multiple of 4.
+            min(int(4000 / bers[-1]) & ~0b11, MAX_LENGTH)
             if bers
             else INITIAL_LENGTH
         )
