@@ -63,7 +63,8 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 def run_simulation(
     ax: Axes, target_ber: float, simulation: Callable[[int, float], float], **kwargs
 ) -> None:
-    MAX_LENGTH = 10**6
+    INITIAL_LENGTH = 4 * 10**4
+    MAX_LENGTH = 10**7
     MAX_EB_N0_DB = 12
 
     bers: list[float] = []
@@ -76,7 +77,7 @@ def run_simulation(
             # lowest multiple of 16.
             min(int(4000 / bers[-1]) & ~0b111, MAX_LENGTH)
             if bers
-            else MAX_LENGTH // 10
+            else INITIAL_LENGTH
         )
 
         bers.append(simulation(length, eb_n0))
