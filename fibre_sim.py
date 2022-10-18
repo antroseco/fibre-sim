@@ -86,14 +86,13 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
         PulseFilter(8, 4),
         Plot(),
         AWGN(N0),
-        Plot(),
         PulseFilter(8, 4),
         Plot(),
         Downsampler(8, 8),
         Plot(),
         Demodulator16QAM(),
     )
-    return simulate_impl(system, 32)
+    return simulate_impl(system, length)
 
 
 def run_simulation(
@@ -142,8 +141,8 @@ if __name__ == "__main__":
     markers = cycle(("o", "x", "s", "*"))
 
     for simulation, label in (
-        # (simulate_bpsk, "Simulated BPSK"),
-        # (simulate_qpsk, "Simulated QPSK"),
+        (simulate_bpsk, "Simulated BPSK"),
+        (simulate_qpsk, "Simulated QPSK"),
         (simulate_16qam, "Simulated 16-QAM"),
     ):
         run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))

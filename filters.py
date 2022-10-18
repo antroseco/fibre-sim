@@ -58,17 +58,13 @@ class Downsampler(Component):
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert data.ndim == 1
-        print(data.size, self.factor)
         # assert data.size % self.factor == 0
 
         # FIXME doesn't work very well for data lengths less than the pulse
         # filter's length
 
         downsampled = np.zeros(data.size // self.factor, dtype=np.cdouble)
-        # FIXME magic
-        downsampled = data[
-            self.samples_per_symbol // 2 + 2 * self.samples_per_symbol :: self.factor
-        ]
+        downsampled = data[:: self.factor]
 
         return downsampled
 
