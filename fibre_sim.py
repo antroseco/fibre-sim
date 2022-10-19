@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
+from filters import Downsampler, PulseFilter, Upsampler
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -18,24 +19,11 @@ from modulation import (
 from system import build_system
 from utils import (
     Component,
+    Plotter,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     calculate_n0,
 )
-from filters import Downsampler, Upsampler, PulseFilter
-
-
-class Plot(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
-    def __call__(self, data: np.ndarray) -> np.ndarray:
-        _, ax = plt.subplots()
-        ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
-        ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
-        ax.legend()
-        plt.show()
-        return data
 
 
 def energy_db_to_lin(db):
@@ -82,14 +70,11 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     system = (
         Modulator16QAM(),
         Upsampler(8),
-        Plot(),
         PulseFilter(8, 4),
-        Plot(),
-        AWGN(N0),
+        # AWGN(N0),
         PulseFilter(8, 4),
-        Plot(),
         Downsampler(8, 8),
-        Plot(),
+        Plotter(),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)
@@ -117,6 +102,7 @@ def run_simulation(
 
         bers.append(simulation(length, eb_n0))
 
+        print(bers[-1])
         if bers[-1] < target_ber:
             break
 
@@ -141,8 +127,8 @@ if __name__ == "__main__":
     markers = cycle(("o", "x", "s", "*"))
 
     for simulation, label in (
-        (simulate_bpsk, "Simulated BPSK"),
-        (simulate_qpsk, "Simulated QPSK"),
+        # (simulate_bpsk, "Simulated BPSK"),
+        # (simulate_qpsk, "Simulated QPSK"),
         (simulate_16qam, "Simulated 16-QAM"),
     ):
         run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy.special import erfc
 
@@ -12,6 +13,21 @@ class Component(ABC):
     @abstractmethod
     def __call__(self, data: np.ndarray) -> np.ndarray:
         pass
+
+
+class Plotter(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        _, ax = plt.subplots()
+        ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
+        ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
+        ax.legend()
+        plt.show()
+        # FIXME this shows all figures...
+        # FIXME need to close the figure after we're done with it.
+        return data
 
 
 def calculate_awgn_ber_with_bpsk(eb_n0: np.ndarray):
