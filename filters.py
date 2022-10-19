@@ -5,24 +5,6 @@ from numpy.typing import NDArray
 from utils import Component
 
 
-def raised_cosine_spectrum(
-    beta: float, points: int
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    T = 1  # FIXME dummy variable.
-    freqs: NDArray = np.linspace(0, 1 / T, points)
-
-    a = (1 - beta) / (2 * T)
-    b = (1 + beta) / (2 * T)
-
-    spectrum = np.zeros_like(freqs)
-
-    cond = (np.abs(freqs) > a) & (np.abs(freqs) <= b)
-    spectrum[cond] = 0.5 * (1 + np.cos(np.pi * T / beta * (np.abs(freqs[cond]) - a)))
-    spectrum[np.abs(freqs) <= a] = 1
-
-    return freqs, spectrum
-
-
 class Upsampler(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
@@ -90,12 +72,11 @@ class PulseFilter(Component):
 def root_raised_cosine(
     beta: float, samples_per_symbol: int, span: int
 ) -> NDArray[np.float64]:
-    # samples_per_symbol is samples per symbol (so it's equivalent to T)
     assert span % 2 == 0
 
     # Normalize by samples_per_symbol to get time in terms of t/T
     t = np.arange(-samples_per_symbol * span // 2, samples_per_symbol * span // 2 + 1)
-    # t = np.linspace(-5, 5, 1001, endpoint=True)
+    # FIXME shouldn't it be T // 2?
     T = samples_per_symbol
     p = np.empty_like(t)
     assert t.size == samples_per_symbol * span + 1
