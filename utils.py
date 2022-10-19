@@ -49,3 +49,19 @@ def calculate_n0(eb_n0: float, bits_per_symbol: int) -> float:
 
     # Each symbol has unit energy, so N0 is just the reciprocal.
     return 1 / es_n0
+
+
+def next_power_of_2(value: int) -> int:
+    # Bit-twiddling trick from Hacker's Delight by Henry S. Warren.
+    # Relies on 32-bit unsigned integer math.
+    assert value > 0
+
+    x = np.asarray(value - 1, dtype=np.uint32)
+
+    x |= x >> np.uint32(1)
+    x |= x >> np.uint32(2)
+    x |= x >> np.uint32(4)
+    x |= x >> np.uint32(8)
+    x |= x >> np.uint32(16)
+
+    return int(x + 1)

@@ -23,6 +23,7 @@ from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     calculate_n0,
+    next_power_of_2,
 )
 
 
@@ -83,8 +84,8 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 def run_simulation(
     ax: Axes, target_ber: float, simulation: Callable[[int, float], float], **kwargs
 ) -> None:
-    INITIAL_LENGTH = 4 * 10**4
-    MAX_LENGTH = 10**7
+    INITIAL_LENGTH = 2**14  # 16,384
+    MAX_LENGTH = 2**24  # 16,777,216
     MAX_EB_N0_DB = 12
 
     bers: list[float] = []
@@ -93,9 +94,9 @@ def run_simulation(
         eb_n0 = energy_db_to_lin(eb_n0_db)
         length = (
             # Magic heuristic that estimates how many samples we need to get a
-            # decent BER estimate. Takes care to round the result to the next
-            # lowest multiple of 4.
-            min(int(4000 / bers[-1]) & ~0b11, MAX_LENGTH)
+            # decent BER estimate. Rounds the result to the next greatest power
+            # of 2, as we will be taking the FFT of the data later.
+            min(next_power_of_2(int(4000 / bers[-1])), MAX_LENGTH)
             if bers
             else INITIAL_LENGTH
         )

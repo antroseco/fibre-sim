@@ -19,7 +19,7 @@ def build_system(
     typecheck_system(data_stream, components)
 
     def simulate_system(symbol_count: int) -> int:
-        MAX_CHUNK_SIZE = 10**6
+        MAX_CHUNK_SIZE = 2**20  # 1,048,576
 
         while symbol_count:
             chunk_size = min(symbol_count, MAX_CHUNK_SIZE)
