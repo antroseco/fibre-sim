@@ -73,11 +73,11 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
         Modulator16QAM(),
         Upsampler(8),
         PulseFilter(8),
-        # AWGN(N0),
+        AWGN(N0),
         PulseFilter(8),
-        SpectrumPlotter(),
+        # SpectrumPlotter(),
+        # Plotter(),
         Downsampler(8, 8),
-        Plotter(),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)
@@ -105,7 +105,6 @@ def run_simulation(
 
         bers.append(simulation(length, eb_n0))
 
-        print(bers[-1])
         if bers[-1] < target_ber:
             break
 

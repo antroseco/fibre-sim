@@ -69,7 +69,16 @@ class PulseFilter(Component):
         self.impulse_response = root_raised_cosine(BETA, samples_per_symbol, SPAN)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        return np.convolve(data, self.impulse_response, mode="same")
+        assert data.size >= self.impulse_response.size
+
+        # Perform a circular convolution using the DFT. We can exploit the
+        # circular property to avoid any edge effects without having to store
+        # anything from the previous chunk. As the data is random anyway, the
+        # data from the current edge is as good as the data from the previous
+        # chunk.
+        return np.fft.ifft(
+            np.fft.fft(data) * np.fft.fft(self.impulse_response, data.size)
+        )
 
 
 def root_raised_cosine(
