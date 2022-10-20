@@ -20,6 +20,7 @@ from system import build_system
 from utils import (
     Component,
     Plotter,
+    SpectrumPlotter,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     calculate_n0,
@@ -71,9 +72,10 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     system = (
         Modulator16QAM(),
         Upsampler(8),
-        PulseFilter(8, 4),
+        PulseFilter(8),
         # AWGN(N0),
-        PulseFilter(8, 4),
+        PulseFilter(8),
+        SpectrumPlotter(),
         Downsampler(8, 8),
         Plotter(),
         Demodulator16QAM(),

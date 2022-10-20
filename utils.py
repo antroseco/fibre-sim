@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -28,6 +29,18 @@ class Plotter(Component):
         # FIXME this shows all figures...
         # FIXME need to close the figure after we're done with it.
         return data
+
+
+class SpectrumPlotter(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        _, ax = plt.subplots()
+        ax.magnitude_spectrum(symbols.tolist())
+        plt.show()
+
+        return symbols
 
 
 def calculate_awgn_ber_with_bpsk(eb_n0: np.ndarray):

@@ -55,15 +55,18 @@ class PulseFilter(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
-    def __init__(self, samples_per_symbol: int, span: int) -> None:
+    def __init__(self, samples_per_symbol: int) -> None:
         super().__init__()
+
+        # A span of 32 is quite long for high values of beta (approaching 1),
+        # but it's way too short for smaller betas. 128 would be a more
+        # appropriate value for betas approaching 0.
+        SPAN = 32
+        BETA = 0.99
+
         assert samples_per_symbol > 0
-        assert span % 2 == 0
 
-        self.samples_per_symbol = samples_per_symbol
-        self.span = span
-
-        self.impulse_response = root_raised_cosine(0.9, samples_per_symbol, span)
+        self.impulse_response = root_raised_cosine(BETA, samples_per_symbol, SPAN)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         return np.convolve(data, self.impulse_response, mode="same")
@@ -97,38 +100,8 @@ def root_raised_cosine(
 
 
 if __name__ == "__main__":
-    points = 33
-
-    rrc = root_raised_cosine(0.99, 10, 8)
+    rrc = root_raised_cosine(0.99, 8, 32)
     plt.plot(rrc)
     plt.show()
-
-    # freqs, s = raised_cosine_spectrum(0.25, 16)  # points // 2 + 1)
-
-    # # plt.plot(freqs, s)
-    # # plt.show()
-
-    # h = np.fft.irfft(s, points)
-    # h = np.concatenate([h[points // 2 + 1 :], h[: points // 2 + 1]])
-    # plt.stem(h, label="raised cosine")
-
-    # rh = np.fft.irfft(np.sqrt(s), points)
-    # rh = np.concatenate([rh[points // 2 + 1 :], rh[: points // 2 + 1]])
-    # # plt.stem(rh, markerfmt="s", label="root raised cosine")
-
-    # plt.legend()
-    # plt.show()
-
-    # cc = np.convolve(rh, rh[::-1], mode="same")
-
-    # plt.stem(cc / np.max(cc), label="Convolution results")
-    # plt.stem(h / np.max(h), label="Actual")
-    # plt.legend()
-    # plt.show()
-
-    # signal = np.zeros(9 * 10)
-    # signal[::9] = np.random.choice([-1, 1], size=10)
-
-    # plt.stem(np.convolve(signal, h))
-
-    # plt.show()
+    plt.magnitude_spectrum(rrc.tolist())
+    plt.show()
