@@ -42,9 +42,9 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
     system = (
         ModulatorBPSK(),
         Upsampler(8),
-        PulseFilter(8, 4),
+        PulseFilter(8),
         AWGN(N0),
-        PulseFilter(8, 4),
+        PulseFilter(8),
         Downsampler(8, 8),
         DemodulatorBPSK(),
     )
@@ -57,9 +57,9 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
     system = (
         ModulatorQPSK(),
         Upsampler(8),
-        PulseFilter(8, 4),
+        PulseFilter(8),
         AWGN(N0),
-        PulseFilter(8, 4),
+        PulseFilter(8),
         Downsampler(8, 8),
         DemodulatorQPSK(),
     )
@@ -111,7 +111,7 @@ def run_simulation(
     ax.plot(range(1, len(bers) + 1), bers, alpha=0.6, **kwargs)
 
 
-if __name__ == "__main__":
+def main() -> None:
     TARGET_BER = 10**-3
 
     eb_n0_db = np.linspace(1, 12, 100)
@@ -129,8 +129,8 @@ if __name__ == "__main__":
     markers = cycle(("o", "x", "s", "*"))
 
     for simulation, label in (
-        # (simulate_bpsk, "Simulated BPSK"),
-        # (simulate_qpsk, "Simulated QPSK"),
+        (simulate_bpsk, "Simulated BPSK"),
+        (simulate_qpsk, "Simulated QPSK"),
         (simulate_16qam, "Simulated 16-QAM"),
     ):
         run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))
@@ -142,3 +142,7 @@ if __name__ == "__main__":
     ax.legend()
 
     plt.show()
+
+
+if __name__ == "__main__":
+    main()
