@@ -5,6 +5,9 @@ from data_stream import DataStream
 from utils import Component
 
 
+MAX_CHUNK_SIZE = 2**20  # 1,048,576
+
+
 def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -> None:
     assert data_stream.output_type == components[0].input_type
     assert components[-1].output_type == data_stream.input_type
@@ -19,8 +22,6 @@ def build_system(
     typecheck_system(data_stream, components)
 
     def simulate_system(symbol_count: int) -> int:
-        MAX_CHUNK_SIZE = 2**20  # 1,048,576
-
         while symbol_count:
             chunk_size = min(symbol_count, MAX_CHUNK_SIZE)
 

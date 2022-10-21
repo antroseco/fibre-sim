@@ -11,7 +11,7 @@ from modulation import (
     ModulatorQPSK,
 )
 from numpy.typing import NDArray
-from system import build_system
+from system import MAX_CHUNK_SIZE, build_system
 from utils import (
     Component,
     calculate_awgn_ber_with_bpsk,
@@ -91,14 +91,15 @@ class TestSystem:
         counter.reset()
 
         # Test automatic fragmentation.
-        bit_errors = system(2 * 10**6 + 1)
+        length = 2 * MAX_CHUNK_SIZE + 1
+        bit_errors = system(length)
 
         # Check that no errors have been reported.
         assert bit_errors == 0
 
         # Check that the data has been split in 3.
         assert counter.calls == 3
-        assert counter.count == 2 * 10**6 + 1
+        assert counter.count == length
 
 
 class TestIntegration:
