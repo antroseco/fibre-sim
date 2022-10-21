@@ -1,3 +1,5 @@
+from functools import cache
+
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
@@ -55,29 +57,40 @@ class PulseFilter(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
+    # A span of 32 is quite long for high values of beta (approaching 1),
+    # but it's way too short for smaller betas. 128 would be a more
+    # appropriate value for betas approaching 0.
+    SPAN = 32
+    BETA = 0.99
+
     def __init__(self, samples_per_symbol: int) -> None:
         super().__init__()
 
-        # A span of 32 is quite long for high values of beta (approaching 1),
-        # but it's way too short for smaller betas. 128 would be a more
-        # appropriate value for betas approaching 0.
-        SPAN = 32
-        BETA = 0.99
-
         assert samples_per_symbol > 0
+        self.samples_per_symbol = samples_per_symbol
 
-        self.impulse_response = root_raised_cosine(BETA, samples_per_symbol, SPAN)
+    @classmethod
+    @cache
+    def get_frequency_response(
+        cls, samples_per_symbol: int, size: int
+    ) -> NDArray[np.cdouble]:
+        impulse_response = root_raised_cosine(cls.BETA, samples_per_symbol, cls.SPAN)
+
+        # If size is smaller than the length of the impulse response, the
+        # impulse response will be cropped.
+        assert size >= impulse_response.size
+
+        return np.fft.fft(impulse_response, size)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert data.size >= self.impulse_response.size
-
         # Perform a circular convolution using the DFT. We can exploit the
         # circular property to avoid any edge effects without having to store
         # anything from the previous chunk. As the data is random anyway, the
         # data from the current edge is as good as the data from the previous
         # chunk.
         return np.fft.ifft(
-            np.fft.fft(data) * np.fft.fft(self.impulse_response, data.size)
+            np.fft.fft(data)
+            * self.get_frequency_response(self.samples_per_symbol, data.size)
         )
 
 
