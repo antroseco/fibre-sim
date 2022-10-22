@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from channel import AWGN
 from data_stream import PseudoRandomStream
+from filters import PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -157,3 +158,25 @@ class TestIntegration:
 
         # All symbols should have unit energy.
         assert np.isclose(self.energy_sensor.mean, 1, atol=1e-3)
+
+    @pytest.mark.parametrize("eb_n0", [1, 2, 3])
+    @pytest.mark.parametrize("samples_per_symbol", [2, 4, 8, 16])
+    def test_16qam_with_pulse_shaping(self, eb_n0: float, samples_per_symbol: int):
+        LENGTH = 2**16
+        N0 = calculate_n0(eb_n0, Modulator16QAM.bits_per_symbol)
+
+        config = (
+            Modulator16QAM(),
+            PulseFilter(up=samples_per_symbol),
+            AWGN(N0),
+            PulseFilter(down=samples_per_symbol),
+            Demodulator16QAM(),
+        )
+        system = build_system(PseudoRandomStream(), config)
+
+        bit_errors = system(LENGTH)
+
+        # Check with the theoretical rate.
+        theoretical_ser = calculate_awgn_ser_with_qam(16, np.asarray(eb_n0))
+        theoretical_ber = theoretical_ser / 4
+        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
