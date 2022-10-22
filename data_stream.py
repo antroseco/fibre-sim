@@ -30,7 +30,7 @@ class PseudoRandomStream(DataStream):
 
         self.last_chunk: Optional[NDArray[np.bool8]] = None
         self.rng = np.random.default_rng()
-        self.lag: Optional[int] = None
+        self.lag_cache: dict[int, int] = {}
 
     def estimate_lag(self, data: NDArray[np.bool8]) -> int:
         assert self.last_chunk is not None
@@ -56,11 +56,13 @@ class PseudoRandomStream(DataStream):
         assert data.size == self.last_chunk.size
 
         # Estimate this once and then cache it for future chunks. The lag should
-        # not change. FIXME what if the length of the next chunk is different?
-        if self.lag is None:
-            self.lag = self.estimate_lag(data)
+        # not change, unless the length of the cache has changed.
+        if data.size not in self.lag_cache:
+            self.lag_cache[data.size] = self.estimate_lag(data)
 
-        self.bit_errors += np.count_nonzero(data ^ np.roll(self.last_chunk, self.lag))
+        self.bit_errors += np.count_nonzero(
+            data ^ np.roll(self.last_chunk, self.lag_cache[data.size])
+        )
 
         # Prevent the last chunk from being reused accidentally.
         self.last_chunk = None

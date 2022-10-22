@@ -11,13 +11,13 @@ def calculate_entropy(data: np.ndarray) -> float:
 
 
 class TestPseudoRandomStream:
-    stream = PseudoRandomStream()
-
-    def test_generate(self):
+    @staticmethod
+    def test_generate():
         LENGTH = 4096
+        stream = PseudoRandomStream()
 
-        first = self.stream.generate(LENGTH)
-        second = self.stream.generate(LENGTH)
+        first = stream.generate(LENGTH)
+        second = stream.generate(LENGTH)
 
         # Check dtype.
         assert first.dtype == second.dtype == np.bool8
@@ -32,30 +32,43 @@ class TestPseudoRandomStream:
         assert calculate_entropy(first) > 0.99
         assert calculate_entropy(second) > 0.99
 
-    def test_validate(self):
+    @staticmethod
+    def test_validate():
         LENGTH = 8
+        stream = PseudoRandomStream()
 
         # validate() should throw if it's called before generate().
         with pytest.raises(Exception):
-            self.stream.validate(np.zeros(LENGTH, dtype=np.bool8))
+            stream.validate(np.zeros(LENGTH, dtype=np.bool8))
 
         # Now it should be fine; and it should report zero errors.
-        data = self.stream.generate(LENGTH)
-        self.stream.validate(data)
+        data = stream.generate(LENGTH)
+        stream.validate(data)
 
-        assert self.stream.bit_errors == 0
+        assert stream.bit_errors == 0
 
         # It should throw if validate() is called consecutively.
         with pytest.raises(Exception):
-            self.stream.validate(data)
+            stream.validate(data)
 
         # It should also throw if the lengths don't match.
-        self.stream.generate(LENGTH)
+        stream.generate(LENGTH)
         with pytest.raises(Exception):
-            self.stream.validate(np.zeros(2 * LENGTH, dtype=np.bool8))
+            stream.validate(np.zeros(2 * LENGTH, dtype=np.bool8))
 
         # Finally test if errors are counted correctly.
-        self.stream.last_chunk = np.zeros(4, dtype=np.bool8)
-        self.stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool8))
+        stream.last_chunk = np.zeros(4, dtype=np.bool8)
+        stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool8))
 
-        assert self.stream.bit_errors == 2
+        assert stream.bit_errors == 2
+
+    def test_different_lengths(self):
+        stream = PseudoRandomStream()
+
+        # Test the *same* stream with data of different lengths. This checks
+        # that the estimated lag is not cached incorrectly.
+        for length in range(1, 1002, 100):
+            data = stream.generate(length)
+            stream.validate(data)
+
+            assert stream.bit_errors == 0
