@@ -105,9 +105,9 @@ def root_raised_cosine(
     # (T = samples_per_symbol)
     t = np.linspace(-span // 2, span // 2, samples_per_symbol * span, endpoint=False)
 
-    assert 0 in t
     assert t.size % 2 == 0
     assert t.size == samples_per_symbol * span
+    assert t[samples_per_symbol * span // 2] == 0
 
     cos_term = np.cos((1 + beta) * np.pi * t)
 
