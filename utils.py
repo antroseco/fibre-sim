@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -78,3 +77,8 @@ def next_power_of_2(value: int) -> int:
     x |= x >> 16
 
     return int(x + 1)
+
+
+def is_power_of_2(value: int) -> bool:
+    # Well-known trick to check if a number is a power of 2.
+    return value > 0 and value & (value - 1) == 0

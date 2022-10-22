@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
+    is_power_of_2,
     next_power_of_2,
 )
 
@@ -53,3 +54,15 @@ class TestNextPowerOf2:
     def test_invalid(value: int):
         with pytest.raises(Exception):
             next_power_of_2(value)
+
+
+class TestIsPowerOf2:
+    @staticmethod
+    @pytest.mark.parametrize("value", (1, 2, 4, 8, 1024))
+    def test_valid(value: int):
+        assert is_power_of_2(value)
+
+    @staticmethod
+    @pytest.mark.parametrize("value", (-1, 0, 3, 5, 1023))
+    def test_invalid(value: int):
+        assert not is_power_of_2(value)

@@ -24,6 +24,7 @@ from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     calculate_n0,
+    is_power_of_2,
     next_power_of_2,
 )
 
@@ -33,6 +34,10 @@ def energy_db_to_lin(db):
 
 
 def simulate_impl(system: Sequence[Component], length: int) -> float:
+    # We take the FFT of the modulated data, so it's best that the data is a
+    # power of 2.
+    assert is_power_of_2(length)
+
     return build_system(PseudoRandomStream(), system)(length) / length
 
 
