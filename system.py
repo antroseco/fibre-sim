@@ -21,9 +21,9 @@ def build_system(
 ) -> Callable[[int], int]:
     typecheck_system(data_stream, components)
 
-    def simulate_system(symbol_count: int) -> int:
-        while symbol_count:
-            chunk_size = min(symbol_count, MAX_CHUNK_SIZE)
+    def simulate_system(bit_count: int) -> int:
+        while bit_count:
+            chunk_size = min(bit_count, MAX_CHUNK_SIZE)
 
             channel_output = reduce(
                 lambda data, comp: comp(data),
@@ -32,7 +32,7 @@ def build_system(
             )
             data_stream.validate(channel_output)
 
-            symbol_count -= chunk_size
+            bit_count -= chunk_size
 
         return data_stream.bit_errors
 
