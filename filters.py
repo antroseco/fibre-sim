@@ -103,11 +103,9 @@ def root_raised_cosine(
 
     # Normalize by samples_per_symbol to get time in terms of t/T
     # (T = samples_per_symbol)
-    t = (
-        np.arange(-samples_per_symbol * span // 2, samples_per_symbol * span // 2)
-        / samples_per_symbol
-    )
+    t = np.linspace(-span // 2, span // 2, samples_per_symbol * span, endpoint=False)
 
+    assert 0 in t
     assert t.size % 2 == 0
     assert t.size == samples_per_symbol * span
 
@@ -130,7 +128,7 @@ def root_raised_cosine(
 
 
 if __name__ == "__main__":
-    rrc = root_raised_cosine(0.51, 128, 32)
+    rrc = root_raised_cosine(0.11, 128, 32)
     plt.plot(rrc)
     plt.show()
     plt.magnitude_spectrum(rrc.tolist())
