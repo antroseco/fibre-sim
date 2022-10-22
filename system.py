@@ -5,7 +5,10 @@ from data_stream import DataStream
 from utils import Component
 
 
-MAX_CHUNK_SIZE = 2**20  # 1,048,576
+# This is significantly faster than larger settings. The current bottleneck is
+# the circular convolution (using fft/ifft) which is sensitive to the length of
+# the data.
+MAX_CHUNK_SIZE = 2**12  # 4,096
 
 
 def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -> None:
