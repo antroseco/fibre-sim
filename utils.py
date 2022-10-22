@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Sequence
 
 import numpy as np
+from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy.special import erfc
 
@@ -12,6 +14,33 @@ class Component(ABC):
     @abstractmethod
     def __call__(self, data: np.ndarray) -> np.ndarray:
         pass
+
+
+class Plotter(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        _, ax = plt.subplots()
+        ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
+        ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
+        ax.legend()
+        plt.show()
+        # FIXME this shows all figures...
+        # FIXME need to close the figure after we're done with it.
+        return data
+
+
+class SpectrumPlotter(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        _, ax = plt.subplots()
+        ax.magnitude_spectrum(symbols.tolist())
+        plt.show()
+
+        return symbols
 
 
 def calculate_awgn_ber_with_bpsk(eb_n0: np.ndarray):
@@ -33,3 +62,19 @@ def calculate_n0(eb_n0: float, bits_per_symbol: int) -> float:
 
     # Each symbol has unit energy, so N0 is just the reciprocal.
     return 1 / es_n0
+
+
+def next_power_of_2(value: int) -> int:
+    # Bit-twiddling trick from Hacker's Delight by Henry S. Warren.
+    # Relies on 32-bit unsigned integer math.
+    assert value > 0
+
+    x = np.asarray(value - 1, dtype=np.uint32)
+
+    x |= x >> np.uint32(1)
+    x |= x >> np.uint32(2)
+    x |= x >> np.uint32(4)
+    x |= x >> np.uint32(8)
+    x |= x >> np.uint32(16)
+
+    return int(x + 1)

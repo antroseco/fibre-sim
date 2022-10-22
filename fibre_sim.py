@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
+from filters import Downsampler, PulseFilter, Upsampler
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -18,9 +19,12 @@ from modulation import (
 from system import build_system
 from utils import (
     Component,
+    Plotter,
+    SpectrumPlotter,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     calculate_n0,
+    next_power_of_2,
 )
 
 
@@ -35,29 +39,55 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 def simulate_bpsk(length: int, eb_n0: float) -> float:
     # BPSK over AWGN channel.
     N0 = calculate_n0(eb_n0, 1)
-    system = (ModulatorBPSK(), AWGN(N0), DemodulatorBPSK())
+    system = (
+        ModulatorBPSK(),
+        Upsampler(8),
+        PulseFilter(8),
+        AWGN(N0),
+        PulseFilter(8),
+        Downsampler(8, 8),
+        DemodulatorBPSK(),
+    )
     return simulate_impl(system, length)
 
 
 def simulate_qpsk(length: int, eb_n0: float) -> float:
     # QPSK over AWGN channel.
     N0 = calculate_n0(eb_n0, 2)
-    system = (ModulatorQPSK(), AWGN(N0), DemodulatorQPSK())
+    system = (
+        ModulatorQPSK(),
+        Upsampler(8),
+        PulseFilter(8),
+        AWGN(N0),
+        PulseFilter(8),
+        Downsampler(8, 8),
+        DemodulatorQPSK(),
+    )
     return simulate_impl(system, length)
 
 
 def simulate_16qam(length: int, eb_n0: float) -> float:
     # 16-QAM over AWGN channel.
     N0 = calculate_n0(eb_n0, 4)
-    system = (Modulator16QAM(), AWGN(N0), Demodulator16QAM())
+    system = (
+        Modulator16QAM(),
+        Upsampler(8),
+        PulseFilter(8),
+        AWGN(N0),
+        PulseFilter(8),
+        # SpectrumPlotter(),
+        # Plotter(),
+        Downsampler(8, 8),
+        Demodulator16QAM(),
+    )
     return simulate_impl(system, length)
 
 
 def run_simulation(
     ax: Axes, target_ber: float, simulation: Callable[[int, float], float], **kwargs
 ) -> None:
-    INITIAL_LENGTH = 4 * 10**4
-    MAX_LENGTH = 10**7
+    INITIAL_LENGTH = 2**14  # 16,384
+    MAX_LENGTH = 2**24  # 16,777,216
     MAX_EB_N0_DB = 12
 
     bers: list[float] = []
@@ -66,9 +96,9 @@ def run_simulation(
         eb_n0 = energy_db_to_lin(eb_n0_db)
         length = (
             # Magic heuristic that estimates how many samples we need to get a
-            # decent BER estimate. Takes care to round the result to the next
-            # lowest multiple of 4.
-            min(int(4000 / bers[-1]) & ~0b11, MAX_LENGTH)
+            # decent BER estimate. Rounds the result to the next greatest power
+            # of 2, as we will be taking the FFT of the data later.
+            min(next_power_of_2(int(4000 / bers[-1])), MAX_LENGTH)
             if bers
             else INITIAL_LENGTH
         )
@@ -81,7 +111,7 @@ def run_simulation(
     ax.plot(range(1, len(bers) + 1), bers, alpha=0.6, **kwargs)
 
 
-if __name__ == "__main__":
+def main() -> None:
     TARGET_BER = 10**-3
 
     eb_n0_db = np.linspace(1, 12, 100)
@@ -112,3 +142,7 @@ if __name__ == "__main__":
     ax.legend()
 
     plt.show()
+
+
+if __name__ == "__main__":
+    main()
