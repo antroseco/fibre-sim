@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from filters import root_raised_cosine
+from filters import PulseFilter, root_raised_cosine
 
 # TODO
 # test for unit energy
@@ -121,3 +121,29 @@ class TestRootRaisedCosine:
 
         energy = np.sum(result**2)
         assert np.isclose(energy, 1, rtol=1e-3)
+
+
+class TestPulseFilter:
+    @staticmethod
+    @pytest.mark.parametrize("samples_per_symbol", (2, 4, 8, 16))
+    def test_round_trip(samples_per_symbol: int):
+        LENGTH = 2**10
+        rng = np.random.default_rng()
+
+        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        data = real + 1j * imag
+
+        up = PulseFilter(up=samples_per_symbol)(data)
+
+        assert up.ndim == 1
+        assert up.dtype == np.cdouble
+        assert up.size > data.size
+
+        down = PulseFilter(down=samples_per_symbol)(up)
+
+        assert down.ndim == 1
+        assert down.dtype == np.cdouble
+        assert down.size == data.size
+
+        assert np.allclose(down, data, atol=0.01)
