@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import Downsampler, PulseFilter, Upsampler
+from filters import PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -46,11 +46,9 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
     N0 = calculate_n0(eb_n0, 1)
     system = (
         ModulatorBPSK(),
-        Upsampler(8),
-        PulseFilter(8),
+        PulseFilter(up=8),
         AWGN(N0),
-        PulseFilter(8),
-        Downsampler(8, 8),
+        PulseFilter(down=8),
         DemodulatorBPSK(),
     )
     return simulate_impl(system, length)
@@ -61,11 +59,9 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
     N0 = calculate_n0(eb_n0, 2)
     system = (
         ModulatorQPSK(),
-        Upsampler(8),
-        PulseFilter(8),
+        PulseFilter(up=8),
         AWGN(N0),
-        PulseFilter(8),
-        Downsampler(8, 8),
+        PulseFilter(down=8),
         DemodulatorQPSK(),
     )
     return simulate_impl(system, length)
@@ -76,13 +72,9 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     N0 = calculate_n0(eb_n0, 4)
     system = (
         Modulator16QAM(),
-        Upsampler(8),
-        PulseFilter(8),
+        PulseFilter(up=8),
         AWGN(N0),
-        PulseFilter(8),
-        # SpectrumPlotter(),
-        # Plotter(),
-        Downsampler(8, 8),
+        PulseFilter(down=8),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)

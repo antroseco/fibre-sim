@@ -1,56 +1,12 @@
-from functools import cache
+from functools import cached_property
+from math import ceil
 
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
+from scipy.signal import upfirdn
 
 from utils import Component
-
-
-class Upsampler(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
-    def __init__(self, factor: int) -> None:
-        super().__init__()
-
-        assert factor > 1
-        self.factor = factor
-
-    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert data.ndim == 1
-
-        upsampled = np.zeros(data.size * self.factor, dtype=np.cdouble)
-        upsampled[:: self.factor] = data
-
-        return upsampled
-
-
-class Downsampler(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
-    def __init__(self, factor: int, samples_per_symbol: int) -> None:
-        super().__init__()
-
-        assert factor > 1
-        # FIXME is 1 sample per symbol valid?
-        assert samples_per_symbol > 0
-
-        self.factor = factor
-        self.samples_per_symbol = samples_per_symbol
-
-    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert data.ndim == 1
-        assert data.size % self.factor == 0
-
-        # FIXME doesn't work very well for data lengths less than the pulse
-        # filter's length
-
-        downsampled = np.zeros(data.size // self.factor, dtype=np.cdouble)
-        downsampled = data[:: self.factor]
-
-        return downsampled
 
 
 class PulseFilter(Component):
@@ -63,24 +19,16 @@ class PulseFilter(Component):
     SPAN = 32
     BETA = 0.99
 
-    def __init__(self, samples_per_symbol: int) -> None:
+    def __init__(self, *, up: int = 1, down: int = 1) -> None:
         super().__init__()
 
-        assert samples_per_symbol > 0
-        self.samples_per_symbol = samples_per_symbol
+        assert (up > 1 and down == 1) or (up == 1 and down > 1)
+        self.up = up
+        self.down = down
 
-    @classmethod
-    @cache
-    def get_frequency_response(
-        cls, samples_per_symbol: int, size: int
-    ) -> NDArray[np.cdouble]:
-        impulse_response = root_raised_cosine(cls.BETA, samples_per_symbol, cls.SPAN)
-
-        # If size is smaller than the length of the impulse response, the
-        # impulse response will be cropped.
-        assert size >= impulse_response.size
-
-        return np.fft.fft(impulse_response, size)
+    @cached_property
+    def impulse_response(self) -> NDArray[np.float64]:
+        return root_raised_cosine(self.BETA, max(self.up, self.down), self.SPAN)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # Perform a circular convolution using the DFT. We can exploit the
@@ -88,10 +36,29 @@ class PulseFilter(Component):
         # anything from the previous chunk. As the data is random anyway, the
         # data from the current edge is as good as the data from the previous
         # chunk.
-        return np.fft.ifft(
-            np.fft.fft(data)
-            * self.get_frequency_response(self.samples_per_symbol, data.size)
-        )
+        filtered = upfirdn(self.impulse_response, data, self.up, self.down)
+
+        if self.down > self.up:
+            # The final symbol overruns by its total length minus the number of
+            # samples per symbol (its alloted space).
+            assert filtered.size == ceil(
+                (data.size + self.SPAN * self.down - 1) / self.down
+            )
+
+            # If we are downsampling, then we need to remove the convolution
+            # artifacts on either side of the signal before we return the
+            # symbols for further processing. The filter is symmetrical,
+            # affecting SPAN / 2 symbols on either side. Since the signal has
+            # been filtered twice, the artifacts now take up SPAN symbols in
+            # total. Need to add 1 to the end index as it's exclusive.
+            return filtered[self.SPAN : -self.SPAN + 1]
+        else:
+            # The final symbol overruns by its total length minus the number of
+            # samples per symbol (its alloted space).
+            assert filtered.size == self.up * (data.size + self.SPAN - 1)
+
+            # Transmit the symbols as is.
+            return filtered
 
 
 def root_raised_cosine(
