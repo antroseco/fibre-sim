@@ -124,6 +124,11 @@ def root_raised_cosine(
     # FIXME have to compute the limits when |t/T| = 1/4β.
     assert np.all(np.isfinite(p))
 
+    # Normalize energy. The equation we use does result in a unit energy signal,
+    # but only if the span is infinite. Since we truncate the filter, we need to
+    # re-normalize the remaining terms.
+    p /= np.sqrt(np.sum(p**2))
+
     return p
 
 
