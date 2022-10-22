@@ -97,32 +97,40 @@ class PulseFilter(Component):
 def root_raised_cosine(
     beta: float, samples_per_symbol: int, span: int
 ) -> NDArray[np.float64]:
+    assert 0 < beta < 1
+    assert samples_per_symbol % 2 == 0
     assert span % 2 == 0
 
     # Normalize by samples_per_symbol to get time in terms of t/T
-    t = np.arange(-samples_per_symbol * span // 2, samples_per_symbol * span // 2 + 1)
-    # FIXME shouldn't it be T // 2?
-    T = samples_per_symbol
-    p = np.empty_like(t)
-    assert t.size == samples_per_symbol * span + 1
+    # (T = samples_per_symbol)
+    t = (
+        np.arange(-samples_per_symbol * span // 2, samples_per_symbol * span // 2)
+        / samples_per_symbol
+    )
 
-    cos_term = np.cos((1 + beta) * np.pi * t / T)
+    assert t.size % 2 == 0
+    assert t.size == samples_per_symbol * span
 
-    sinc_term = np.sinc(((1 - beta) * np.pi * t / T) / (np.pi))
+    cos_term = np.cos((1 + beta) * np.pi * t)
+
+    # numpy implements the normalized sinc function, so we need to divide by π
+    # to obtain the unnormalized sinc(x) = sin(x)/x.
+    sinc_term = np.sinc((1 - beta) * t)
     sinc_term *= (1 - beta) * np.pi / (4 * beta)
 
-    denominator = 1 - (4 * beta * t / T) ** 2
+    denominator = 1 - (4 * beta * t) ** 2
 
     p = (cos_term + sinc_term) / denominator
-    p *= 4 * beta / (np.pi * np.sqrt(T))
+    p *= 4 * beta / (np.pi * np.sqrt(samples_per_symbol))
 
+    # FIXME have to compute the limits when |t/T| = 1/4β.
     assert np.all(np.isfinite(p))
 
     return p
 
 
 if __name__ == "__main__":
-    rrc = root_raised_cosine(0.99, 8, 32)
+    rrc = root_raised_cosine(0.51, 128, 32)
     plt.plot(rrc)
     plt.show()
     plt.magnitude_spectrum(rrc.tolist())
