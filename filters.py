@@ -97,11 +97,3 @@ def root_raised_cosine(
     p /= np.sqrt(np.sum(p**2))
 
     return p
-
-
-if __name__ == "__main__":
-    rrc = root_raised_cosine(0.11, 128, 32)
-    plt.plot(rrc)
-    plt.show()
-    plt.magnitude_spectrum(rrc.tolist())
-    plt.show()
