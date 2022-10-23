@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy.signal import upfirdn
+from scipy.constants import speed_of_light
 
 from utils import Component
 
@@ -97,3 +98,56 @@ def root_raised_cosine(
     p /= np.sqrt(np.sum(p**2))
 
     return p
+
+
+class ChromaticDispersion(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    # D = 17 ps/nm/km at λ = 1550 nm according to Digital Coherent Optical
+    # Systems.
+    GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)
+
+    # Carrier wavelength = 1550 nm.
+    WAVELENGTH = 1550e-9
+
+    def __init__(self, length: float, f_c: float) -> None:
+        super().__init__()
+
+        assert length > 0
+        self.length = length
+
+        assert f_c > 0
+        self.sampling_interval = 1 / f_c
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert symbols.ndim == 1
+
+        # This is the baseband representation of the signal, which has the same
+        # bandwidth as the upconverted PAM signal. It's already centered around
+        # 0, so there's no need to subtract the carrier frequency from its
+        # spectrum.
+        Df = np.fft.fftfreq(symbols.size, self.sampling_interval)
+
+        cd = np.exp(
+            1j
+            * np.pi
+            * self.WAVELENGTH**2
+            * self.GROUP_VELOCITY_DISPERSION
+            * self.length
+            / speed_of_light
+            * Df**2
+        )
+
+        # FIXME this is circular convolution.
+        return np.fft.ifft(np.fft.fft(symbols) * cd)
+
+
+if __name__ == "__main__":
+    SpS = 64
+    rrc = np.tile(root_raised_cosine(0.9, SpS, 8), 4)
+    cd = ChromaticDispersion(5e3, SpS * 50e9)(rrc.astype(np.cdouble))
+    assert np.allclose(np.abs(np.fft.fft(rrc)), np.abs(np.fft.fft(cd)))
+    plt.plot(rrc)
+    plt.plot(np.abs(cd))
+    plt.show()

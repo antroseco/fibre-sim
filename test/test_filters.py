@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from filters import PulseFilter, root_raised_cosine
+from filters import ChromaticDispersion, PulseFilter, root_raised_cosine
 
 # TODO
 # test for unit energy
@@ -147,3 +147,31 @@ class TestPulseFilter:
         assert down.size == data.size
 
         assert np.allclose(down, data, atol=0.01)
+
+
+class TestChromaticDispersion:
+    # 50 GSamples/s at 8 bits/Sample.
+    cd = ChromaticDispersion(50e3, 50e9 * 8)
+
+    def test_spectrum(self):
+        LENGTH = 2**10
+        rng = np.random.default_rng()
+
+        real = rng.uniform(-2, 2, size=LENGTH)
+        imag = rng.integers(-2, 2, size=LENGTH)
+        data = real + 1j * imag
+
+        result = self.cd(data)
+
+        assert np.all(np.isfinite(result))
+        assert result.size == data.size
+
+        data_fft = np.fft.fft(data)
+        result_fft = np.fft.fft(result)
+
+        assert np.all(np.isfinite(data_fft))
+        assert np.all(np.isfinite(result_fft))
+
+        # Only the phase of each component should had changed.
+        assert np.allclose(np.abs(result_fft), np.abs(data_fft))
+        assert np.any(np.angle(result_fft) != np.angle(data_fft))
