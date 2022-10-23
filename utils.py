@@ -21,8 +21,8 @@ class Plotter(Component):
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         _, ax = plt.subplots()
-        ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
-        ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
+        ax.stem(np.real(data), markerfmt="bo", label="In-phase")
+        ax.stem(np.imag(data), markerfmt="go", label="Quadrature")
         ax.legend()
         plt.show()
         # FIXME this shows all figures...

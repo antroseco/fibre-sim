@@ -4,8 +4,10 @@ from math import ceil
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
-from scipy.signal import upfirdn
+from scipy.signal import upfirdn, get_window, resample, filtfilt
+from scipy.signal.windows import kaiser
 from scipy.constants import speed_of_light
+from channel import AWGN
 
 from utils import Component
 
@@ -111,7 +113,7 @@ class ChromaticDispersion(Component):
     # Carrier wavelength = 1550 nm.
     WAVELENGTH = 1550e-9
 
-    def __init__(self, length: float, f_c: float) -> None:
+    def __init__(self, length: float, f_c: float, SpS: int) -> None:
         super().__init__()
 
         assert length > 0
@@ -120,14 +122,32 @@ class ChromaticDispersion(Component):
         assert f_c > 0
         self.sampling_interval = 1 / f_c
 
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert SpS > 1
+        self.SpS = SpS
+
+    def __call__(
+        self, symbols: NDArray[np.cdouble], prefix=True
+    ) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
+
+        if prefix:
+            prefix = np.concatenate(
+                [
+                    np.zeros(24 * self.SpS),
+                    root_raised_cosine(0.11, self.SpS, 8),
+                    np.zeros(24 * self.SpS),
+                ]
+            )
+
+            signal = np.concatenate((prefix, symbols))
+        else:
+            signal = symbols
 
         # This is the baseband representation of the signal, which has the same
         # bandwidth as the upconverted PAM signal. It's already centered around
         # 0, so there's no need to subtract the carrier frequency from its
         # spectrum.
-        Df = np.fft.fftfreq(symbols.size, self.sampling_interval)
+        Df = np.fft.fftfreq(signal.size, self.sampling_interval)
 
         cd = np.exp(
             1j
@@ -140,14 +160,72 @@ class ChromaticDispersion(Component):
         )
 
         # FIXME this is circular convolution.
-        return np.fft.ifft(np.fft.fft(symbols) * cd)
+        return np.fft.ifft(np.fft.fft(signal) * cd)
+
+
+class CDCompensator(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __init__(self, SpS: int) -> None:
+        super().__init__()
+
+        assert SpS >= 1
+        self.SpS = SpS
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert symbols.ndim == 1
+
+        prefix = symbols[: 56 * self.SpS]
+
+        # FIXME determine Kaiser window parameter.
+        spectrum = np.fft.fft(prefix * kaiser(prefix.size, 4))
+        inverse_spectrum = np.exp(-1j * np.angle(spectrum))
+
+        fir = np.fft.ifft(inverse_spectrum)
+        fir /= np.sum(np.abs(fir) ** 2)
+
+        return np.convolve(symbols[56 * self.SpS :], fir, mode="same")
+
+
+def main():
+    SpS = 64
+    CD = ChromaticDispersion(70e3, SpS * 50e9, SpS)
+    noise = AWGN(5e-4)
+
+    prefix = np.concatenate(
+        [np.zeros(24 * SpS), root_raised_cosine(0.11, SpS, 8), np.zeros(24 * SpS)]
+    )
+    signal = np.concatenate([prefix, np.tile(root_raised_cosine(0.11, SpS, 8), 8)])
+    rcv_prefix = noise(CD(signal.astype(np.cdouble), prefix=False)[: 56 * SpS])
+    plt.plot(signal)
+    plt.plot(np.abs(rcv_prefix))
+    plt.show()
+
+    # FIXME determine Kaiser window parameter.
+    spectrum = np.fft.fft(rcv_prefix * kaiser(rcv_prefix.size, 4))
+    inverse_spectrum = np.exp(-1j * np.angle(spectrum))
+    plt.plot(np.angle(spectrum))
+    plt.plot(np.angle(inverse_spectrum))
+    plt.title("Spectrum")
+    plt.show()
+
+    fir = np.fft.ifft(inverse_spectrum)
+    fir /= np.sum(np.abs(fir) ** 2)
+    plt.stem(np.abs(fir))
+    plt.title("FIR")
+    plt.show()
+
+    test_sig = np.tile(root_raised_cosine(0.11, SpS, 8), 8)
+    cd = CD(test_sig.astype(np.cdouble), prefix=False)
+    plt.plot(np.real(cd), label="Received (real)")
+    plt.plot(np.imag(cd), label="Received (imag)")
+    plt.plot(test_sig, label="Original")
+    plt.plot(np.real(np.convolve(cd, fir, mode="same")), label="Recovered")
+    plt.legend()
+    plt.title("Test")
+    plt.show()
 
 
 if __name__ == "__main__":
-    SpS = 64
-    rrc = np.tile(root_raised_cosine(0.9, SpS, 8), 4)
-    cd = ChromaticDispersion(5e3, SpS * 50e9)(rrc.astype(np.cdouble))
-    assert np.allclose(np.abs(np.fft.fft(rrc)), np.abs(np.fft.fft(cd)))
-    plt.plot(rrc)
-    plt.plot(np.abs(cd))
-    plt.show()
+    main()

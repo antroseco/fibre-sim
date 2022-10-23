@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import PulseFilter
+from filters import CDCompensator, ChromaticDispersion, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -73,8 +73,14 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     system = (
         Modulator16QAM(),
         PulseFilter(up=8),
+        # Plotter(),  # 8440
+        ChromaticDispersion(10e3, 50e9 * 8, 8),
+        # Plotter(),  # 8888
         AWGN(N0),
         PulseFilter(down=8),
+        CDCompensator(1),
+        # Plotter(),  # 1080
+        # Plotter(),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)
@@ -111,6 +117,9 @@ def run_simulation(
 def main() -> None:
     TARGET_BER = 10**-3
 
+    # print(simulate_16qam(2**10, 2))
+    # return
+
     eb_n0_db = np.linspace(1, 12, 100)
     eb_n0 = energy_db_to_lin(eb_n0_db)
 
@@ -126,8 +135,8 @@ def main() -> None:
     markers = cycle(("o", "x", "s", "*"))
 
     for simulation, label in (
-        (simulate_bpsk, "Simulated BPSK"),
-        (simulate_qpsk, "Simulated QPSK"),
+        # (simulate_bpsk, "Simulated BPSK"),
+        # (simulate_qpsk, "Simulated QPSK"),
         (simulate_16qam, "Simulated 16-QAM"),
     ):
         run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))
