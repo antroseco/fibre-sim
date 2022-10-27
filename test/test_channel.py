@@ -4,7 +4,7 @@ from channel import AWGN
 
 
 class TestAWGN:
-    test_data = np.arange(1000) + 2j
+    test_data = np.arange(2**12) + 2j
 
     def test_preserves_length(self):
         awgn = AWGN(1)
