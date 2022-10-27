@@ -84,15 +84,12 @@ def is_power_of_2(value: int) -> bool:
     return value > 0 and value & (value - 1) == 0
 
 
-def overlap_save(h: NDArray, x: NDArray) -> NDArray[np.cdouble]:
+def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdouble]:
     # Ensure neither array is empty.
     assert h.ndim == 1
     assert h.size >= 1
     assert x.ndim == 1
     assert x.size >= 1
-
-    # Data should be at least as long as the FIR filter.
-    assert h.size <= x.size
 
     # N is the frame length. Based on:
     # https://commons.wikimedia.org/wiki/File:FFT_size_vs_filter_length_for_Overlap-add_convolution.svg
@@ -107,6 +104,11 @@ def overlap_save(h: NDArray, x: NDArray) -> NDArray[np.cdouble]:
 
     # Compute the DFT of h, but append enough zeros to match the frame length N.
     H = np.fft.fft(h, N)
+
+    # Pad x to capture the complete convolution of the two signals (equivalent
+    # to numpy mode "full"). The default is equivalent to "same".
+    if full:
+        x = np.pad(x, (0, M))
 
     # Output array.
     y = np.zeros_like(x, dtype=np.cdouble)

@@ -3,7 +3,7 @@ from typing import Sequence
 
 import numpy as np
 import pytest
-from scipy.signal import lfilter
+from scipy.signal import convolve, lfilter
 from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
@@ -80,11 +80,18 @@ class TestOverlapSave:
         h = rng.normal(size=fir_length) + 1j * rng.normal(size=fir_length)
         x = rng.normal(size=data_length) + 1j * rng.normal(size=data_length)
 
+        # Test default mode "same".
         result = overlap_save(h, x)
         expected = lfilter(h, 1, x, zi=None)
 
         assert result.size == np.size(expected)
         assert np.allclose(result, expected)
+
+        # Test mode "full".
+        result = overlap_save(h, x, full=True)
+        expected = convolve(h, x)
+
+        assert result.size == np.size(expected)
 
     @staticmethod
     @pytest.mark.parametrize(
@@ -109,6 +116,3 @@ class TestOverlapSave:
 
         with pytest.raises(Exception):
             overlap_save(np.arange(1), np.arange(0))
-
-        with pytest.raises(Exception):
-            overlap_save(np.arange(2), np.arange(1))
