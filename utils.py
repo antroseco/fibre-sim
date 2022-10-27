@@ -94,8 +94,9 @@ def overlap_save(h: NDArray, x: NDArray) -> NDArray[np.cdouble]:
     # Data should be at least as long as the FIR filter.
     assert h.size <= x.size
 
-    # N is the frame length.
-    N = 512
+    # N is the frame length. Based on:
+    # https://commons.wikimedia.org/wiki/File:FFT_size_vs_filter_length_for_Overlap-add_convolution.svg
+    N = max(128, next_power_of_2(h.size) * 8)
 
     # M is the order of the filter.
     M = h.size - 1
