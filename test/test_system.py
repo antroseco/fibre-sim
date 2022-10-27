@@ -162,7 +162,7 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     @pytest.mark.parametrize("samples_per_symbol", [2, 4, 8, 16])
     def test_16qam_with_pulse_shaping(self, eb_n0: float, samples_per_symbol: int):
-        LENGTH = 2**16
+        LENGTH = 2**17
         N0 = calculate_n0(eb_n0, Modulator16QAM.bits_per_symbol)
 
         config = (
