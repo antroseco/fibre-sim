@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Literal
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -82,3 +83,57 @@ def next_power_of_2(value: int) -> int:
 def is_power_of_2(value: int) -> bool:
     # Well-known trick to check if a number is a power of 2.
     return value > 0 and value & (value - 1) == 0
+
+
+def overlap_save(h: NDArray, x: NDArray) -> NDArray[np.cdouble]:
+    # Ensure neither array is empty.
+    assert h.ndim == 1
+    assert h.size >= 1
+    assert x.ndim == 1
+    assert x.size >= 1
+
+    # Data should be at least as long as the FIR filter.
+    assert h.size <= x.size
+
+    # N is the frame length.
+    N = 512
+
+    # M is the order of the filter.
+    M = h.size - 1
+    assert M < N
+
+    # The number of useful data points per frame.
+    step_size = N - M
+
+    # Compute the DFT of h, but append enough zeros to match the frame length N.
+    H = np.fft.fft(h, N)
+
+    # Output array.
+    y = np.zeros_like(x, dtype=np.cdouble)
+
+    # Overlap cache; initially zero.
+    last_m = np.zeros(M)
+
+    for i in range(0, x.size, step_size):
+        assert last_m.size == M
+
+        data_len = min(step_size, x.size - i)
+
+        # np.concatenate would had made a copy anyway. This approach copies too,
+        # but also zero pads the array to length N for free.
+        frame = np.zeros(N, dtype=np.cdouble)
+        frame[:M] = last_m
+        frame[M : M + data_len] = x[i : i + data_len]
+
+        X = np.fft.fft(frame)
+        yt = np.fft.ifft(H * X)
+
+        y[i : i + data_len] = yt[M : M + data_len]
+
+        # If the filter order is not zero, we need to save enough data to avoid
+        # edge effects in the next frame.
+        if M:
+            # A view, so no copy.
+            last_m = frame[-M:]
+
+    return y

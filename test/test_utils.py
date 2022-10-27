@@ -1,13 +1,15 @@
 from math import ceil, log2
+from typing import Sequence
 
 import numpy as np
 import pytest
-from matplotlib import pyplot as plt
+from scipy.signal import lfilter
 from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     is_power_of_2,
     next_power_of_2,
+    overlap_save,
 )
 
 
@@ -66,3 +68,47 @@ class TestIsPowerOf2:
     @pytest.mark.parametrize("value", (-1, 0, 3, 5, 1023))
     def test_invalid(value: int):
         assert not is_power_of_2(value)
+
+
+class TestOverlapSave:
+    @staticmethod
+    @pytest.mark.parametrize("fir_length", (1, 2, 3, 4, 5, 6, 7, 8))
+    @pytest.mark.parametrize("data_length", (8, 16, 1024, 4096))
+    def test_random(fir_length: int, data_length: int):
+        rng = np.random.default_rng()
+
+        h = rng.normal(size=fir_length) + 1j * rng.normal(size=fir_length)
+        x = rng.normal(size=data_length) + 1j * rng.normal(size=data_length)
+
+        result = overlap_save(h, x)
+        expected = lfilter(h, 1, x, zi=None)
+
+        assert result.size == np.size(expected)
+        assert np.allclose(result, expected)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "fir,expected",
+        (
+            ((1, 2), (1, 2, 0, 2, 4, 0, 3, 6, 0, 4, 8, 0, 5, 10, 0, 0)),
+            ((-1, 2, 1), (-1, 2, 1, -2, 4, 2, -3, 6, 3, -4, 8, 4, -5, 10, 5, 0)),
+            ((-1, 2, 1, 2), (-1, 2, 1, 0, 4, 2, 1, 6, 3, 2, 8, 4, 3, 10, 5, 10)),
+        ),
+    )
+    def test_simple(fir: Sequence[float], expected: Sequence[float]):
+        h = np.asarray(fir)
+        x = np.asarray((1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 0))
+
+        result = overlap_save(h, x)
+        assert np.allclose(result, expected)
+
+    @staticmethod
+    def test_invalid():
+        with pytest.raises(Exception):
+            overlap_save(np.arange(0), np.arange(1))
+
+        with pytest.raises(Exception):
+            overlap_save(np.arange(1), np.arange(0))
+
+        with pytest.raises(Exception):
+            overlap_save(np.arange(2), np.arange(1))
