@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Literal
 
 import numpy as np
 from matplotlib import pyplot as plt
