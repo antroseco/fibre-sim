@@ -154,23 +154,30 @@ class Demodulator16QAM(Demodulator):
 
     @staticmethod
     def impl(
-        symbols: NDArray[np.float64],
+        symbols: NDArray[np.float64], scale: float
     ) -> tuple[NDArray[np.bool8], NDArray[np.bool8]]:
         assert symbols.ndim == 1
 
         # FIXME explanation. Replace magic numbers.
         msbs = symbols > 0
-        lsbs = np.abs(symbols) <= (2 / np.sqrt(10))
+        lsbs = np.abs(symbols) <= (2 * scale / np.sqrt(10))
 
         return msbs, lsbs
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool8]:
         super().__call__(symbols)
 
+        # FIXME this should be replaced with a proper filter. Due to pulse
+        # shaping and downsampling, the symbols no longer have unit energy. As
+        # we rely on a threshold to distinguish between the inner and outer
+        # constellation squares, we need to scale it based on the mean energy
+        # of the received symbols.
+        scale = np.sqrt(np.mean(np.abs(symbols) ** 2))
+
         # Each symbols carries 4 bits. The in-phase component contains the 2
         # LSBs, and the quadrature component contains the 2 MSBs.
         data = np.empty(symbols.size * self.bits_per_symbol, dtype=np.bool8)
-        data[0::4], data[1::4] = self.impl(-np.imag(symbols))
-        data[2::4], data[3::4] = self.impl(np.real(symbols))
+        data[0::4], data[1::4] = self.impl(-np.imag(symbols), scale)
+        data[2::4], data[3::4] = self.impl(np.real(symbols), scale)
 
         return data
