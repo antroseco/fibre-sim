@@ -156,14 +156,14 @@ class ChromaticDispersion(Component):
     # Carrier wavelength = 1550 nm.
     WAVELENGTH = 1550e-9
 
-    def __init__(self, length: float, f_c: float) -> None:
+    def __init__(self, length: float, sampling_rate: float) -> None:
         super().__init__()
 
         assert length > 0
         self.length = length
 
-        assert f_c > 0
-        self.sampling_interval = 1 / f_c
+        assert sampling_rate > 0
+        self.sampling_interval = 1 / sampling_rate
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
