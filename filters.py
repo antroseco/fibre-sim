@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import speed_of_light
+from scipy.linalg import toeplitz
 from scipy.special import erf
 
 from utils import Component, overlap_save, signal_energy
@@ -17,7 +18,7 @@ class PulseFilter(Component):
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
     SPAN = 32
-    BETA = 0.99
+    BETA = 0.24
 
     def __init__(
         self,
@@ -201,8 +202,17 @@ class CDCompensator(CDBase):
     vol. 32, no. 8, pp. 1449-1456, April15, 2014, doi: 10.1109/JLT.2014.2307916.
     """
 
-    def __init__(self, length: float, sampling_rate: float, fir_length: int) -> None:
+    def __init__(
+        self,
+        length: float,
+        sampling_rate: float,
+        samples_per_symbol: int,
+        fir_length: int,
+    ) -> None:
         super().__init__(length, sampling_rate)
+
+        assert samples_per_symbol > 0
+        self.samples_per_symbol = samples_per_symbol
 
         # Filter length N_c is assumed to be odd. Since the bounds are from
         # -(N_c - 1)/2 to (N_c - 1)/2 then it should be at least 3.
@@ -228,9 +238,29 @@ class CDCompensator(CDBase):
 
         return D
 
+    @cached_property
+    def omega(self) -> float:
+        return np.pi * (1 + PulseFilter.BETA) / self.samples_per_symbol
+
+    @cached_property
+    def Q(self) -> NDArray[np.float64]:
+        # Q is a Hermitian Toeplitz matrix, so we only need to compute its first
+        # column.
+        n = np.arange(self.fir_length)
+
+        first_column = np.empty_like(n)
+        first_column[0] = self.omega / np.pi  # n = 0 is a special case.
+        first_column[1:] = np.sin(n[1:] * self.omega) / (n[1:] * np.pi)
+
+        # FIXME epsilon term.
+        return toeplitz(first_column) + np.eye(self.fir_length)
+
+    @cached_property
+    def h(self) -> NDArray[np.cdouble]:
+        return np.linalg.solve(self.Q, self.D)
+
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        # This is the full-band case, where Ω2 = -Ω1 = π.
-        return overlap_save(self.D, data, True)[
+        return overlap_save(self.h, data, True)[
             self.fir_length // 2 : -self.fir_length // 2 + 1
         ]
 
