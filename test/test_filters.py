@@ -153,7 +153,7 @@ class TestPulseFilter:
 
 
 class TestChromaticDispersion:
-    # 50 GSamples/s at 8 bits/Sample.
+    # 50 GigaSymbols/s at 8 samples per symbol.
     cd = ChromaticDispersion(50e3, 50e9 * 8)
 
     def test_spectrum(self):
