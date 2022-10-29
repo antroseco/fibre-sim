@@ -1,9 +1,9 @@
+from concurrent.futures import ProcessPoolExecutor
 from itertools import cycle
 from typing import Callable, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
@@ -31,6 +31,7 @@ CHANNEL_SPS = 16
 RECEIVER_SPS = 2
 FIBRE_LENGTH = 100_000  # 100 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
+TARGET_BER = 10**-3
 
 
 def energy_db_to_lin(db):
@@ -91,12 +92,13 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 
 
 def run_simulation(
-    ax: Axes, target_ber: float, simulation: Callable[[int, float], float], **kwargs
-) -> None:
+    simulation: Callable[[int, float], float]
+) -> tuple[list[int], list[float]]:
     INITIAL_LENGTH = 2**14  # 16,384
     MAX_LENGTH = 2**24  # 16,777,216
     MAX_EB_N0_DB = 12
 
+    eb_n0_dbs: list[int] = []
     bers: list[float] = []
 
     for eb_n0_db in range(1, MAX_EB_N0_DB + 1):
@@ -110,16 +112,29 @@ def run_simulation(
             else INITIAL_LENGTH
         )
 
+        eb_n0_dbs.append(eb_n0_db)
         bers.append(simulation(length, eb_n0))
 
-        if bers[-1] < target_ber:
+        if bers[-1] < TARGET_BER:
             break
 
-    ax.plot(range(1, len(bers) + 1), bers, alpha=0.6, **kwargs)
+    return eb_n0_dbs, bers
 
 
 def main() -> None:
-    TARGET_BER = 10**-3
+    _, ax = plt.subplots()
+
+    markers = cycle(("o", "x", "s", "*"))
+    labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
+    simulations = (simulate_bpsk, simulate_qpsk, simulate_16qam)
+
+    with ProcessPoolExecutor() as executor:
+        for label, marker, (eb_n0_dbs, bers) in zip(
+            labels,
+            markers,
+            executor.map(run_simulation, simulations),
+        ):
+            ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
 
     eb_n0_db = np.linspace(1, 12, 100)
     eb_n0 = energy_db_to_lin(eb_n0_db)
@@ -128,19 +143,8 @@ def main() -> None:
     # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
     th_ber_16qam = calculate_awgn_ser_with_qam(16, eb_n0) / 4
 
-    _, ax = plt.subplots()
-
     ax.plot(eb_n0_db, th_ber_psk, alpha=0.2, linewidth=5, label="Theoretical BPSK/QPSK")
     ax.plot(eb_n0_db, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical 16-QAM")
-
-    markers = cycle(("o", "x", "s", "*"))
-
-    for simulation, label in (
-        (simulate_bpsk, "Simulated BPSK"),
-        (simulate_qpsk, "Simulated QPSK"),
-        (simulate_16qam, "Simulated 16-QAM"),
-    ):
-        run_simulation(ax, TARGET_BER, simulation, label=label, marker=next(markers))
 
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
