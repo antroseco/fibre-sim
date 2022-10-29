@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 from data_stream import PseudoRandomStream
+from numpy.typing import NDArray
 
 
-def calculate_entropy(data: np.ndarray) -> float:
+def calculate_entropy(data: NDArray[np.bool8]) -> float:
     _, counts = np.unique(data, return_counts=True)
     frequencies = counts / np.sum(counts)
 

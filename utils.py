@@ -11,7 +11,7 @@ class Component(ABC):
     output_type = None
 
     @abstractmethod
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: NDArray) -> NDArray:
         pass
 
 
@@ -19,7 +19,7 @@ class Plotter(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         _, ax = plt.subplots()
         ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
         ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
@@ -42,7 +42,7 @@ class SpectrumPlotter(Component):
         return symbols
 
 
-def calculate_awgn_ber_with_bpsk(eb_n0: np.ndarray):
+def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]):
     return 0.5 * erfc(np.sqrt(eb_n0))
 
 

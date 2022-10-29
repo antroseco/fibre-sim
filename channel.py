@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 import numpy as np
+from numpy.typing import NDArray
 
 from utils import Component
 
@@ -10,7 +11,7 @@ class Channel(Component):
     output_type = "cd symbols"
 
     @abstractmethod
-    def __call__(self, symbols: np.ndarray) -> np.ndarray:
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
 
 
@@ -26,7 +27,7 @@ class AWGN(Channel):
 
         self.rng = np.random.default_rng()
 
-    def __call__(self, symbols: np.ndarray) -> np.ndarray:
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         super().__call__(symbols)
 
         # Each symbol can consist of multiple samples. The mean energy of each
