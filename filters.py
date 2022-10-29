@@ -2,11 +2,10 @@ from functools import cached_property
 from typing import Optional
 
 import numpy as np
-from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy.constants import speed_of_light
 
-from utils import Component, overlap_save
+from utils import Component, overlap_save, signal_energy
 
 
 class PulseFilter(Component):
@@ -52,7 +51,7 @@ class PulseFilter(Component):
     def impulse_response(self) -> NDArray[np.float64]:
         rrc = root_raised_cosine(self.BETA, self.samples_per_symbol, self.SPAN)
         assert np.argmax(rrc) == rrc.size // 2
-        assert np.isclose(np.sum(np.abs(rrc**2)), 1)
+        assert np.isclose(signal_energy(rrc), 1)
 
         return rrc
 
@@ -76,8 +75,8 @@ class PulseFilter(Component):
         # rest of the samples.
         downsampled = symbols[:: self.down]
 
-        original_energy = np.sum(np.abs(symbols) ** 2)
-        downsampled_energy = np.sum(np.abs(downsampled) ** 2)
+        original_energy = signal_energy(symbols)
+        downsampled_energy = signal_energy(downsampled)
 
         # Preserve signal energy. This is crucial if we want the matched filter
         # to work without any external normalization.
@@ -141,7 +140,7 @@ def root_raised_cosine(
     # Normalize energy. The equation we use does result in a unit energy signal,
     # but only if the span is infinite. Since we truncate the filter, we need to
     # re-normalize the remaining terms.
-    p /= np.sqrt(np.sum(p**2))
+    p /= np.sqrt(signal_energy(p))
 
     return p
 

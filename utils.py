@@ -131,3 +131,11 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
             last_m = frame[-M:]
 
     return y
+
+
+def signal_energy(signal: NDArray) -> float:
+    return np.sum(np.abs(signal) ** 2)
+
+
+def mean_sample_energy(signal: NDArray) -> float:
+    return np.mean(np.abs(signal) ** 2)

@@ -17,6 +17,7 @@ from utils import (
     Component,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
+    signal_energy,
 )
 
 
@@ -54,7 +55,7 @@ class EnergySensor(Component):
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # Symbol energy is defined as the expected value of |x_k|^2 for all
         # constellation symbols x_k.
-        energy = np.sum(np.abs(symbols) ** 2)
+        energy = signal_energy(symbols)
         total = self.mean * self.count + energy
 
         self.count += symbols.size

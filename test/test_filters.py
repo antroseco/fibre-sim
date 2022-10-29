@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from filters import ChromaticDispersion, PulseFilter, root_raised_cosine
+from utils import signal_energy
 
 # TODO
 # test for unit energy
@@ -119,8 +120,7 @@ class TestRootRaisedCosine:
         result = root_raised_cosine(beta, samples_per_symbol, span)
         assert np.all(np.isreal(result))
 
-        energy = np.sum(result**2)
-        assert np.isclose(energy, 1, rtol=1e-3)
+        assert np.isclose(signal_energy(result), 1, rtol=1e-3)
 
 
 class TestPulseFilter:

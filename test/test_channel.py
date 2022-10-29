@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from channel import AWGN
+from utils import mean_sample_energy, signal_energy
 
 
 class TestAWGN:
@@ -33,7 +34,7 @@ class TestAWGN:
         # Check Es/N0. N0 is the noise power spectral density, but white noise
         # has a flat power spectrum, equal to the variance of the Gaussian
         # distribution generating the noise.
-        es = np.sum(np.abs(self.test_data) ** 2) / noise.size
+        es = mean_sample_energy(self.test_data)
         n0 = np.var(noise)
         assert np.isclose(es / n0, es_n0, atol=0.1)
 
@@ -48,7 +49,7 @@ class TestAWGN:
         symbols = np.zeros(SYMBOL_COUNT * samples_per_symbol)
         symbols[::samples_per_symbol] = np.sqrt(ES)
 
-        assert np.isclose(np.sum(np.abs(symbols) ** 2) / SYMBOL_COUNT, ES)
+        assert np.isclose(signal_energy(symbols) / SYMBOL_COUNT, ES)
 
         awgn = AWGN(ES_N0, samples_per_symbol)
         noise = awgn(symbols) - symbols

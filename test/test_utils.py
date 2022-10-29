@@ -8,8 +8,10 @@ from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     is_power_of_2,
+    mean_sample_energy,
     next_power_of_2,
     overlap_save,
+    signal_energy,
 )
 
 
@@ -116,3 +118,29 @@ class TestOverlapSave:
 
         with pytest.raises(Exception):
             overlap_save(np.arange(1), np.arange(0))
+
+
+class TestEnergy:
+    @staticmethod
+    @pytest.mark.parametrize("amplitude", range(4))
+    def test_signal_energy(amplitude: int):
+        LENGTH = 16
+
+        signal = np.full(LENGTH, amplitude)
+        energy = signal_energy(signal)
+
+        assert np.isfinite(energy)
+        assert energy >= 0
+        assert np.isclose(energy, LENGTH * amplitude**2)
+
+    @staticmethod
+    @pytest.mark.parametrize("amplitude", range(4))
+    def test_mean_sample_energy(amplitude: int):
+        LENGTH = 16
+
+        signal = np.full(LENGTH, amplitude)
+        energy = mean_sample_energy(signal)
+
+        assert np.isfinite(energy)
+        assert energy >= 0
+        assert np.isclose(energy, amplitude**2)
