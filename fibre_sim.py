@@ -28,6 +28,10 @@ from utils import (
 )
 
 
+CHANNEL_SPS = 16
+RECEIVER_SPS = 2
+
+
 def energy_db_to_lin(db):
     return 10 ** (db / 10)
 
@@ -44,10 +48,10 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
     # BPSK over AWGN channel.
     system = (
         ModulatorBPSK(),
-        PulseFilter(16, up=16),
-        AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, 2),
-        PulseFilter(2, down=8),
-        Downsample(2),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, RECEIVER_SPS),
+        PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        Downsample(RECEIVER_SPS),
         DemodulatorBPSK(),
     )
     return simulate_impl(system, length)
@@ -57,10 +61,10 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
     # QPSK over AWGN channel.
     system = (
         ModulatorQPSK(),
-        PulseFilter(16, up=16),
-        AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, 2),
-        PulseFilter(2, down=8),
-        Downsample(2),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, RECEIVER_SPS),
+        PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        Downsample(RECEIVER_SPS),
         DemodulatorQPSK(),
     )
     return simulate_impl(system, length)
@@ -70,10 +74,10 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     # 16-QAM over AWGN channel.
     system = (
         Modulator16QAM(),
-        PulseFilter(16, up=16),
-        AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, 2),
-        PulseFilter(2, down=8),
-        Downsample(2),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
+        PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        Downsample(RECEIVER_SPS),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)
