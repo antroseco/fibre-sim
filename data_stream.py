@@ -3,7 +3,6 @@ from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.signal import correlate, correlation_lags
 
 
 class DataStream(ABC):
@@ -32,18 +31,6 @@ class PseudoRandomStream(DataStream):
         self.rng = np.random.default_rng()
         self.lag_cache: dict[int, int] = {}
 
-    def estimate_lag(self, data: NDArray[np.bool8]) -> int:
-        assert self.last_chunk is not None
-
-        corrs = correlate(
-            data.astype(float), self.last_chunk.astype(float), method="fft"
-        )
-        lags = correlation_lags(data.size, self.last_chunk.size)
-
-        # Return the lag that corresponds to the greatest cross-correlation
-        # between the two signals.
-        return lags[np.argmax(corrs)]
-
     def generate(self, length: int) -> NDArray[np.bool8]:
         self.last_chunk = self.rng.integers(
             0, 1, endpoint=True, size=length, dtype=np.bool8
@@ -55,14 +42,7 @@ class PseudoRandomStream(DataStream):
         assert self.last_chunk is not None
         assert data.size == self.last_chunk.size
 
-        # Estimate this once and then cache it for future chunks. The lag should
-        # not change, unless the length of the cache has changed.
-        if data.size not in self.lag_cache:
-            self.lag_cache[data.size] = self.estimate_lag(data)
-
-        self.bit_errors += np.count_nonzero(
-            data ^ np.roll(self.last_chunk, self.lag_cache[data.size])
-        )
+        self.bit_errors += np.count_nonzero(data ^ self.last_chunk)
 
         # Prevent the last chunk from being reused accidentally.
         self.last_chunk = None
