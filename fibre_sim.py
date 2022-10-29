@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import PulseFilter
+from filters import Downsample, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -23,7 +23,6 @@ from utils import (
     SpectrumPlotter,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
-    calculate_n0,
     is_power_of_2,
     next_power_of_2,
 )
@@ -43,12 +42,12 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 
 def simulate_bpsk(length: int, eb_n0: float) -> float:
     # BPSK over AWGN channel.
-    N0 = calculate_n0(eb_n0, 1)
     system = (
         ModulatorBPSK(),
-        PulseFilter(up=8),
-        AWGN(N0),
-        PulseFilter(down=8),
+        PulseFilter(16, up=16),
+        AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, 2),
+        PulseFilter(2, down=8),
+        Downsample(2),
         DemodulatorBPSK(),
     )
     return simulate_impl(system, length)
@@ -56,12 +55,12 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
 
 def simulate_qpsk(length: int, eb_n0: float) -> float:
     # QPSK over AWGN channel.
-    N0 = calculate_n0(eb_n0, 2)
     system = (
         ModulatorQPSK(),
-        PulseFilter(up=8),
-        AWGN(N0),
-        PulseFilter(down=8),
+        PulseFilter(16, up=16),
+        AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, 2),
+        PulseFilter(2, down=8),
+        Downsample(2),
         DemodulatorQPSK(),
     )
     return simulate_impl(system, length)
@@ -69,12 +68,12 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
 
 def simulate_16qam(length: int, eb_n0: float) -> float:
     # 16-QAM over AWGN channel.
-    N0 = calculate_n0(eb_n0, 4)
     system = (
         Modulator16QAM(),
-        PulseFilter(up=8),
-        AWGN(N0),
-        PulseFilter(down=8),
+        PulseFilter(16, up=16),
+        AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, 2),
+        PulseFilter(2, down=8),
+        Downsample(2),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)

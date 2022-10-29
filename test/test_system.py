@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import PulseFilter
+from filters import Downsample, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -17,7 +17,6 @@ from utils import (
     Component,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
-    calculate_n0,
 )
 
 
@@ -109,9 +108,13 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_bpsk_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        N0 = calculate_n0(eb_n0, ModulatorBPSK.bits_per_symbol)
 
-        config = (ModulatorBPSK(), self.energy_sensor, AWGN(N0), DemodulatorBPSK())
+        config = (
+            ModulatorBPSK(),
+            self.energy_sensor,
+            AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, 1),
+            DemodulatorBPSK(),
+        )
         system = build_system(PseudoRandomStream(), config)
 
         bit_errors = system(LENGTH)
@@ -126,9 +129,13 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_qpsk_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        N0 = calculate_n0(eb_n0, ModulatorQPSK.bits_per_symbol)
 
-        config = (ModulatorQPSK(), self.energy_sensor, AWGN(N0), DemodulatorQPSK())
+        config = (
+            ModulatorQPSK(),
+            self.energy_sensor,
+            AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, 1),
+            DemodulatorQPSK(),
+        )
         system = build_system(PseudoRandomStream(), config)
 
         bit_errors = system(LENGTH)
@@ -144,9 +151,13 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_16qam_over_awgn(self, eb_n0: float):
         LENGTH = 10**6
-        N0 = calculate_n0(eb_n0, Modulator16QAM.bits_per_symbol)
 
-        config = (Modulator16QAM(), self.energy_sensor, AWGN(N0), Demodulator16QAM())
+        config = (
+            Modulator16QAM(),
+            self.energy_sensor,
+            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, 1),
+            Demodulator16QAM(),
+        )
         system = build_system(PseudoRandomStream(), config)
 
         bit_errors = system(LENGTH)
@@ -163,13 +174,13 @@ class TestIntegration:
     @pytest.mark.parametrize("samples_per_symbol", [2, 4, 8, 16])
     def test_16qam_with_pulse_shaping(self, eb_n0: float, samples_per_symbol: int):
         LENGTH = 2**17
-        N0 = calculate_n0(eb_n0, Modulator16QAM.bits_per_symbol)
 
         config = (
             Modulator16QAM(),
-            PulseFilter(up=samples_per_symbol),
-            AWGN(N0),
-            PulseFilter(down=samples_per_symbol),
+            PulseFilter(samples_per_symbol, up=samples_per_symbol),
+            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, 2),
+            PulseFilter(2, down=samples_per_symbol // 2),
+            Downsample(2),
             Demodulator16QAM(),
         )
         system = build_system(PseudoRandomStream(), config)

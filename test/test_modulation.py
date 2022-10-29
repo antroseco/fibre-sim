@@ -332,6 +332,6 @@ class TestDemodulator16QAM:
         assert np.all(self.demodulator(modulator(data)) == data)
 
         # Small amounts of noise should not introduce any errors.
-        noise_r = rng.uniform(-0.3, 0.3, size=SYM_LENGTH)
-        noise_i = rng.uniform(-0.3, 0.3, size=SYM_LENGTH) * 1j
+        noise_r = rng.uniform(-0.2, 0.2, size=SYM_LENGTH)
+        noise_i = rng.uniform(-0.2, 0.2, size=SYM_LENGTH) * 1j
         assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)

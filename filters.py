@@ -1,13 +1,12 @@
 from functools import cached_property
-from math import ceil
+from typing import Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
-from scipy.signal import upfirdn
 from scipy.constants import speed_of_light
 
-from utils import Component
+from utils import Component, overlap_save
 
 
 class PulseFilter(Component):
@@ -20,53 +19,100 @@ class PulseFilter(Component):
     SPAN = 32
     BETA = 0.99
 
-    def __init__(self, *, up: int = 1, down: int = 1) -> None:
+    def __init__(
+        self,
+        samples_per_symbol: int,
+        *,
+        up: Optional[int] = None,
+        down: Optional[int] = None
+    ) -> None:
         super().__init__()
 
-        assert (up > 1 and down == 1) or (up == 1 and down > 1)
+        # Need at least 2 samples per symbol to satisfy the Nyquist–Shannon
+        # sampling theorem (raised cosine filter has bandwidth between 1/2T and
+        # 1/T depending on the value of beta). This is the one-sided baseband
+        # bandwidth of the pulse; even though the negative frequencies contain
+        # useful information (as the signal is complex) the Nyquist frequency is
+        # the same.
+        assert samples_per_symbol > 1
+        self.samples_per_symbol = samples_per_symbol
+
+        # It doesn't make sense to set both.
+        if up is not None:
+            assert up > 0
+            assert down is None
+        if down is not None:
+            assert down > 0
+            assert up is None
+
         self.up = up
         self.down = down
 
     @cached_property
     def impulse_response(self) -> NDArray[np.float64]:
-        return root_raised_cosine(self.BETA, max(self.up, self.down), self.SPAN)
+        rrc = root_raised_cosine(self.BETA, self.samples_per_symbol, self.SPAN)
+        assert np.argmax(rrc) == rrc.size // 2
+        assert np.isclose(np.sum(np.abs(rrc**2)), 1)
 
-    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        # Perform a circular convolution using the DFT. We can exploit the
-        # circular property to avoid any edge effects without having to store
-        # anything from the previous chunk. As the data is random anyway, the
-        # data from the current edge is as good as the data from the previous
-        # chunk.
-        filtered = upfirdn(self.impulse_response, data, self.up, self.down)
+        return rrc
 
-        if self.down > self.up:
-            # The final symbol overruns by its total length minus the number of
-            # samples per symbol (its alloted space).
-            assert filtered.size == ceil(
-                (data.size + self.SPAN * self.down - 1) / self.down
-            )
+    def upsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert self.up is not None
+        assert symbols.size > 0
 
-            # If we are downsampling, then we need to remove the convolution
-            # artifacts on either side of the signal before we return the
-            # symbols for further processing. The filter is symmetrical,
-            # affecting SPAN / 2 symbols on either side. Since the signal has
-            # been filtered twice, the artifacts now take up SPAN symbols in
-            # total. Need to add 1 to the end index as it's exclusive.
-            return filtered[self.SPAN : -self.SPAN + 1]
-        else:
-            # The final symbol overruns by its total length minus the number of
-            # samples per symbol (its alloted space).
-            assert filtered.size == self.up * (data.size + self.SPAN - 1)
+        # This is quite fast actually (https://stackoverflow.com/a/73994667).
+        upsampled = np.zeros(symbols.size * self.up - (self.up - 1), dtype=np.cdouble)
+        upsampled[:: self.up] = symbols
 
-            # Transmit the symbols as is.
-            return filtered
+        return upsampled
+
+    def downsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert self.down is not None
+        assert symbols.size > 0
+        assert symbols.size % self.down == 0
+
+        # Don't bother copying to a new array. Also don't bother running it
+        # through a low-pass filter, as the actual ADC wouldn't know about the
+        # rest of the samples.
+        downsampled = symbols[:: self.down]
+
+        original_energy = np.sum(np.abs(symbols) ** 2)
+        downsampled_energy = np.sum(np.abs(downsampled) ** 2)
+
+        # Preserve signal energy. This is crucial if we want the matched filter
+        # to work without any external normalization.
+        return downsampled * np.sqrt(original_energy / downsampled_energy)
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert symbols.ndim == 1
+
+        # Perform any {up, down}sampling first.
+        if self.up:
+            symbols = self.upsample(symbols)
+        if self.down:
+            symbols = self.downsample(symbols)
+
+        # Filter the data with the impulse response of the filter.
+        filtered = overlap_save(self.impulse_response, symbols, full=True)
+
+        if self.down:
+            # FIXME document this.
+            return filtered[
+                self.SPAN
+                * self.samples_per_symbol : -(self.SPAN - 1)
+                * self.samples_per_symbol
+                + 1
+            ]
+
+        # Transmit the symbols as is.
+        return filtered
 
 
 def root_raised_cosine(
     beta: float, samples_per_symbol: int, span: int
 ) -> NDArray[np.float64]:
     assert 0 < beta < 1
-    assert samples_per_symbol % 2 == 0
+    assert samples_per_symbol > 0
     assert span % 2 == 0
 
     # Normalize by samples_per_symbol to get time in terms of t/T
@@ -143,11 +189,16 @@ class ChromaticDispersion(Component):
         return np.fft.ifft(np.fft.fft(symbols) * cd)
 
 
-if __name__ == "__main__":
-    SpS = 64
-    rrc = np.tile(root_raised_cosine(0.9, SpS, 8), 4)
-    cd = ChromaticDispersion(5e3, SpS * 50e9)(rrc.astype(np.cdouble))
-    assert np.allclose(np.abs(np.fft.fft(rrc)), np.abs(np.fft.fft(cd)))
-    plt.plot(rrc)
-    plt.plot(np.abs(cd))
-    plt.show()
+class Downsample(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __init__(self, factor: int) -> None:
+        super().__init__()
+
+        assert factor > 1
+        self.factor = factor
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        # FIXME should we normalize the energy here?
+        return symbols[:: self.factor]
