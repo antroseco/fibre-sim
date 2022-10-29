@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import Downsample, PulseFilter
+from filters import CDCompensator, ChromaticDispersion, Downsample, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -27,9 +27,10 @@ from utils import (
     next_power_of_2,
 )
 
-
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
+FIBRE_LENGTH = 100_000  # 100 km
+SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 
 
 def energy_db_to_lin(db):
@@ -49,8 +50,10 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
     system = (
         ModulatorBPSK(),
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, 129),  # FIXME order
         Downsample(RECEIVER_SPS),
         DemodulatorBPSK(),
     )
@@ -62,8 +65,10 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
     system = (
         ModulatorQPSK(),
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, 129),  # FIXME order
         Downsample(RECEIVER_SPS),
         DemodulatorQPSK(),
     )
@@ -75,8 +80,10 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     system = (
         Modulator16QAM(),
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, 129),  # FIXME order
         Downsample(RECEIVER_SPS),
         Demodulator16QAM(),
     )

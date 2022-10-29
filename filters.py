@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import speed_of_light
+from scipy.special import erf
 
 from utils import Component, overlap_save, signal_energy
 
@@ -23,7 +24,7 @@ class PulseFilter(Component):
         samples_per_symbol: int,
         *,
         up: Optional[int] = None,
-        down: Optional[int] = None
+        down: Optional[int] = None,
     ) -> None:
         super().__init__()
 
@@ -145,7 +146,7 @@ def root_raised_cosine(
     return p
 
 
-class ChromaticDispersion(Component):
+class CDBase(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
@@ -165,6 +166,17 @@ class ChromaticDispersion(Component):
         assert sampling_rate > 0
         self.sampling_interval = 1 / sampling_rate
 
+    @cached_property
+    def K(self) -> float:
+        return (
+            self.GROUP_VELOCITY_DISPERSION
+            * self.WAVELENGTH**2
+            * self.length
+            / (4 * np.pi * speed_of_light * self.sampling_interval**2)
+        )
+
+
+class ChromaticDispersion(CDBase):
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
 
@@ -174,18 +186,53 @@ class ChromaticDispersion(Component):
         # spectrum.
         Df = np.fft.fftfreq(symbols.size, self.sampling_interval)
 
-        cd = np.exp(
-            1j
-            * np.pi
-            * self.WAVELENGTH**2
-            * self.GROUP_VELOCITY_DISPERSION
-            * self.length
-            / speed_of_light
-            * Df**2
-        )
+        arg = self.K * (2 * np.pi * self.sampling_interval) ** 2
+        cd = np.exp(-1j * arg * Df**2)
 
         # FIXME this is circular convolution.
         return np.fft.ifft(np.fft.fft(symbols) * cd)
+
+
+class CDCompensator(CDBase):
+    """Compensate Chromatic Dispersion, using the FIR filter derived in
+    A. Eghbali, H. Johansson, O. Gustafsson and S. J. Savory, "Optimal
+    Least-Squares FIR Digital Filters for Compensation of Chromatic Dispersion
+    in Digital Coherent Optical Receivers," in Journal of Lightwave Technology,
+    vol. 32, no. 8, pp. 1449-1456, April15, 2014, doi: 10.1109/JLT.2014.2307916.
+    """
+
+    def __init__(self, length: float, sampling_rate: float, fir_length: int) -> None:
+        super().__init__(length, sampling_rate)
+
+        # Filter length N_c is assumed to be odd. Since the bounds are from
+        # -(N_c - 1)/2 to (N_c - 1)/2 then it should be at least 3.
+        assert fir_length >= 3
+        assert fir_length % 2 == 1
+        self.fir_length = fir_length
+
+    @cached_property
+    def D(self) -> NDArray[np.cdouble]:
+        half_length = (self.fir_length - 1) // 2
+        n = np.arange(-half_length, half_length + 1)
+        assert n.size == self.fir_length
+
+        K = self.K
+        pi_3_4 = np.pi * 3 / 4
+
+        erf_arg = np.exp(1j * pi_3_4) / (2 * np.sqrt(K))
+        erf_small = erf(erf_arg * (2 * K * np.pi - n))
+        erf_large = erf(erf_arg * (2 * K * np.pi + n))
+
+        D = erf_small + erf_large
+        D *= np.exp(-1j * (n**2 / (4 * K) + pi_3_4)) / (4 * np.sqrt(np.pi * K))
+
+        return D
+
+    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        # This is the full-band case, where Ω2 = -Ω1 = π.
+        return overlap_save(self.D, data, True)[
+            self.fir_length // 2 : -self.fir_length // 2 + 1
+        ]
 
 
 class Downsample(Component):
