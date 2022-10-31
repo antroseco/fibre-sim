@@ -1,9 +1,12 @@
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from functools import partial
 from itertools import cycle
+from multiprocessing import cpu_count
 from typing import Callable, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
+from numpy.typing import NDArray
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
@@ -21,8 +24,8 @@ from utils import (
     Component,
     Plotter,
     SpectrumPlotter,
+    calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
-    calculate_awgn_ser_with_qam,
     is_power_of_2,
     next_power_of_2,
 )
@@ -31,10 +34,29 @@ CHANNEL_SPS = 16
 RECEIVER_SPS = 2
 FIBRE_LENGTH = 100_000  # 100 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
-TARGET_BER = 10**-3
+TARGET_BER = 0.5 * 10**-3
+
+# Each simulation operates on its own data and the workload is very SIMD/math
+# heavy. As the execution unit is the bottleneck, there is no benefit to
+# hyper-threading. See https://stackoverflow.com/a/30720868.
+#
+# Tests on an Intel i7-9750H (6 cores, 12 threads).
+#
+# With 12 processes:
+# Executed in   40.35 secs
+#    usr time  194.24 secs
+#    sys time    8.16 secs
+#
+# With 6 processes:
+# Executed in   38.28 secs
+#    usr time  205.69 secs
+#    sys time    2.34 secs
+#
+# Therefore we should divide by 2 to avoid scheduling two processes on one core.
+PHYSICAL_CORES = cpu_count() // 2
 
 
-def energy_db_to_lin(db):
+def energy_db_to_lin(db: NDArray) -> NDArray[np.float64]:
     return 10 ** (db / 10)
 
 
@@ -98,33 +120,28 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 
 
 def run_simulation(
-    simulation: Callable[[int, float], float]
-) -> tuple[list[int], list[float]]:
-    INITIAL_LENGTH = 2**14  # 16,384
+    p_executor: ProcessPoolExecutor,
+    ber_function: Callable[[NDArray[np.float64]], NDArray[np.float64]],
+    simulation: Callable[[int, float], float],
+) -> tuple[NDArray[np.int64], list[float]]:
     MAX_LENGTH = 2**24  # 16,777,216
     MAX_EB_N0_DB = 12
 
-    eb_n0_dbs: list[int] = []
-    bers: list[float] = []
+    eb_n0_dbs = np.arange(1, MAX_EB_N0_DB + 1)
+    eb_n0s = energy_db_to_lin(eb_n0_dbs)
 
-    for eb_n0_db in range(1, MAX_EB_N0_DB + 1):
-        eb_n0 = energy_db_to_lin(eb_n0_db)
-        length = (
-            # Magic heuristic that estimates how many samples we need to get a
-            # decent BER estimate. Rounds the result to the next greatest power
-            # of 2, as we will be taking the FFT of the data later.
-            min(next_power_of_2(int(4000 / bers[-1])), MAX_LENGTH)
-            if bers
-            else INITIAL_LENGTH
-        )
+    # Only simulate up to the target BER.
+    expected_bers = filter(lambda ber: ber > TARGET_BER, ber_function(eb_n0s))
 
-        eb_n0_dbs.append(eb_n0_db)
-        bers.append(simulation(length, eb_n0))
+    # Magic heuristic that estimates how many samples we need to get a decent
+    # BER estimate. Rounds the result to the next greatest power of 2, as we
+    # will be taking the FFT of the data later.
+    lengths = [min(next_power_of_2(int(4000 / i)), MAX_LENGTH) for i in expected_bers]
 
-        if bers[-1] < TARGET_BER:
-            break
-
-    return eb_n0_dbs, bers
+    # TODO would be nice if this returned the iterator and the plot updated as
+    # the results came in.
+    bers = list(p_executor.map(simulation, lengths, eb_n0s))
+    return eb_n0_dbs[: len(bers)], bers
 
 
 def main() -> None:
@@ -133,12 +150,22 @@ def main() -> None:
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
     simulations = (simulate_bpsk, simulate_qpsk, simulate_16qam)
+    ber_estimators = (
+        calculate_awgn_ber_with_bpsk,
+        calculate_awgn_ber_with_bpsk,
+        calculate_awgn_ber_with_16qam,
+    )
 
-    with ProcessPoolExecutor() as executor:
+    with (
+        ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
+        ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
+    ):
+        fn = partial(run_simulation, p_executor)
+
         for label, marker, (eb_n0_dbs, bers) in zip(
             labels,
             markers,
-            executor.map(run_simulation, simulations),
+            t_executor.map(fn, ber_estimators, simulations),
         ):
             ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
 
@@ -146,8 +173,7 @@ def main() -> None:
     eb_n0 = energy_db_to_lin(eb_n0_db)
 
     th_ber_psk = calculate_awgn_ber_with_bpsk(eb_n0)
-    # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
-    th_ber_16qam = calculate_awgn_ser_with_qam(16, eb_n0) / 4
+    th_ber_16qam = calculate_awgn_ber_with_16qam(eb_n0)
 
     ax.plot(eb_n0_db, th_ber_psk, alpha=0.2, linewidth=5, label="Theoretical BPSK/QPSK")
     ax.plot(eb_n0_db, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical 16-QAM")

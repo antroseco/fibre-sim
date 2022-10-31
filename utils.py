@@ -42,7 +42,7 @@ class SpectrumPlotter(Component):
         return symbols
 
 
-def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]):
+def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
     return 0.5 * erfc(np.sqrt(eb_n0))
 
 
@@ -53,6 +53,11 @@ def calculate_awgn_ser_with_qam(
 
     # Equation 2.16 in Digital Coherent Optical Systems.
     return 2 * (1 - 1 / np.sqrt(M)) * erfc(np.sqrt(3 * es_n0 / (2 * (M - 1))))
+
+
+def calculate_awgn_ber_with_16qam(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
+    # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
+    return calculate_awgn_ser_with_qam(16, eb_n0) / 4
 
 
 def next_power_of_2(value: int) -> int:
