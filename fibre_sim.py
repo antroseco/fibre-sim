@@ -144,6 +144,36 @@ def run_simulation(
     return eb_n0_dbs[: len(bers)], bers
 
 
+def plot_cd_compensation_fir() -> None:
+    """Replicate Figure 6 (the real parts, the imaginary parts, and the absolute
+    values of the impulse response of the Chromatic Dispersion FIR compensation
+    filter) from the paper.
+
+    Parameters:
+    N = 31
+    Length = 500 km
+    Sampling frequency = 21.4 GHz
+    c = 3e8 m/s (we use the actual value)
+    D = 17 ps/nm/km
+    λ = 1553 nm (we use 1550 nm)
+    L = 2
+    """
+    cdc = CDCompensator(500_000, 21.4e9, 2, 31)
+
+    fig, axs = plt.subplots(nrows=3)
+    fig.suptitle("CD Compensation FIR filter")
+    fig.supylabel("Magnitude")
+    fig.supxlabel("$n$")
+    fig.subplots_adjust(hspace=0.75)
+    axs[0].set_title("Real part")
+    axs[0].stem(range(-15, 16), np.real(cdc.D))
+    axs[1].set_title("Imaginary part")
+    axs[1].stem(range(-15, 16), np.imag(cdc.D))
+    axs[2].set_title("Absolute value")
+    axs[2].stem(range(-15, 16), np.abs(cdc.D))
+    plt.show()
+
+
 def main() -> None:
     _, ax = plt.subplots()
 
