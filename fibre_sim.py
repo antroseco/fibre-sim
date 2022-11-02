@@ -174,6 +174,70 @@ def plot_cd_compensation_fir() -> None:
     plt.show()
 
 
+def plot_cd_compensation_ber() -> None:
+    """Replicate part of Figure 9 (simulated uncoded BER for 16-QAM data, for
+    Example 2) from the paper.
+
+    Parameters:
+    N = 479
+    Length = 1000 km
+    Sampling frequency = 80 GHz
+    K = 69.605
+    c = 3e8 m/s (we use the actual value)
+    D = 17 ps/nm/km
+    λ = 1553 nm (we use 1550 nm)
+    L = 2
+    ε = 1e-14 (FIXME not implemented yet)
+    """
+    N = 479
+    fibre_length = 1_000_000  # FIXME doesn't work with such long fibres.
+    sampling_freq = 80 * 10**9
+    samples_per_symbol = 2
+
+    cdc = CDCompensator(fibre_length, sampling_freq, samples_per_symbol, N)
+    assert np.isclose(cdc.K, 69.605, rtol=0.01)
+
+    def simulation(eb_n0: float) -> float:
+        system = (
+            Modulator16QAM(),
+            PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+            ChromaticDispersion(fibre_length, sampling_freq),
+            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, samples_per_symbol),
+            Downsample(8),
+            cdc,
+            PulseFilter(samples_per_symbol, down=1),
+            Downsample(samples_per_symbol),
+            Demodulator16QAM(),
+        )
+        return simulate_impl(system, 2**20)
+
+    # We can't pickle local functions, so we can't use an executor
+    # unfortunately.
+    sim_eb_n0_dbs = np.arange(10, 17)
+    sim_eb_n0s = energy_db_to_lin(sim_eb_n0_dbs)
+    bers = list(map(simulation, sim_eb_n0s))
+
+    _, ax = plt.subplots()
+
+    th_eb_n0_dbs = np.linspace(sim_eb_n0_dbs.min(), sim_eb_n0_dbs.max(), 100)
+    th_eb_n0s = energy_db_to_lin(th_eb_n0_dbs)
+
+    th_ber_16qam = calculate_awgn_ber_with_16qam(th_eb_n0s)
+
+    ax.plot(
+        th_eb_n0_dbs, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical 16-QAM"
+    )
+    ax.plot(sim_eb_n0_dbs, bers, alpha=0.6, label="Simulation", marker="*")
+
+    ax.set_ylim(10**-6)
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("$E_b/N_0$ (dB)")
+    ax.legend()
+
+    plt.show()
+
+
 def main() -> None:
     _, ax = plt.subplots()
 
