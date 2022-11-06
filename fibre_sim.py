@@ -32,7 +32,7 @@ from utils import (
 
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
-FIBRE_LENGTH = 100_000  # 100 km
+FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
 
