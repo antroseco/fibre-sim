@@ -72,6 +72,9 @@ class PulseFilter(Component):
         assert symbols.size > 0
         assert symbols.size % self.down == 0
 
+        if self.down == 1:
+            return symbols
+
         # Don't bother copying to a new array. Also don't bother running it
         # through a low-pass filter, as the actual ADC wouldn't know about the
         # rest of the samples.
