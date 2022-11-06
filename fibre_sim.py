@@ -69,17 +69,23 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
     return build_system(PseudoRandomStream(), system)(length) / length
 
 
-def simulate_bpsk(length: int, eb_n0: float) -> float:
-    # BPSK over AWGN channel.
-    system = (
-        ModulatorBPSK(),
+def default_link(es_n0: float) -> Sequence[Component]:
+    return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, RECEIVER_SPS),
+        AWGN(es_n0, RECEIVER_SPS),
         Downsample(CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
         PulseFilter(RECEIVER_SPS, down=1),
         Downsample(RECEIVER_SPS),
+    )
+
+
+def simulate_bpsk(length: int, eb_n0: float) -> float:
+    # BPSK over AWGN channel.
+    system = (
+        ModulatorBPSK(),
+        *default_link(eb_n0 * ModulatorBPSK.bits_per_symbol),
         DemodulatorBPSK(),
     )
     return simulate_impl(system, length)
@@ -89,13 +95,7 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
     # QPSK over AWGN channel.
     system = (
         ModulatorQPSK(),
-        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, RECEIVER_SPS),
-        Downsample(CHANNEL_SPS // RECEIVER_SPS),
-        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
-        PulseFilter(RECEIVER_SPS, down=1),
-        Downsample(RECEIVER_SPS),
+        *default_link(eb_n0 * ModulatorQPSK.bits_per_symbol),
         DemodulatorQPSK(),
     )
     return simulate_impl(system, length)
@@ -105,13 +105,7 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
     # 16-QAM over AWGN channel.
     system = (
         Modulator16QAM(),
-        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
-        Downsample(CHANNEL_SPS // RECEIVER_SPS),
-        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
-        PulseFilter(RECEIVER_SPS, down=1),
-        Downsample(RECEIVER_SPS),
+        *default_link(eb_n0 * Modulator16QAM.bits_per_symbol),
         Demodulator16QAM(),
     )
     return simulate_impl(system, length)
