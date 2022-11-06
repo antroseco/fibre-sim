@@ -32,6 +32,7 @@ from utils import (
 
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
+CDC_TAPS = 127  # 2**n - 1 to minimize overlap-save frame size.
 FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
@@ -77,7 +78,7 @@ def simulate_bpsk(length: int, eb_n0: float) -> float:
         AWGN(eb_n0 * ModulatorBPSK.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(
-            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, 129
+            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
         ),  # FIXME order
         Downsample(RECEIVER_SPS),
         DemodulatorBPSK(),
@@ -94,7 +95,7 @@ def simulate_qpsk(length: int, eb_n0: float) -> float:
         AWGN(eb_n0 * ModulatorQPSK.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(
-            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, 129
+            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
         ),  # FIXME order
         Downsample(RECEIVER_SPS),
         DemodulatorQPSK(),
@@ -111,7 +112,7 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
         AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
         PulseFilter(RECEIVER_SPS, down=CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(
-            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, 251
+            FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
         ),  # FIXME order
         Downsample(RECEIVER_SPS),
         Demodulator16QAM(),
