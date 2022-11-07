@@ -128,7 +128,7 @@ def run_simulation(
     # Magic heuristic that estimates how many samples we need to get a decent
     # BER estimate. Rounds the result to the next greatest power of 2, as we
     # will be taking the FFT of the data later.
-    lengths = [min(next_power_of_2(int(4000 / i)), MAX_LENGTH) for i in expected_bers]
+    lengths = [min(next_power_of_2(int(700 / i)), MAX_LENGTH) for i in expected_bers]
 
     # TODO would be nice if this returned the iterator and the plot updated as
     # the results came in.
