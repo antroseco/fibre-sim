@@ -3,7 +3,7 @@ from abc import abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
-from utils import Component
+from utils import Component, mean_sample_energy
 
 
 class Channel(Component):
@@ -33,7 +33,7 @@ class AWGN(Channel):
         # Each symbol can consist of multiple samples. The mean energy of each
         # symbol is the mean energy per sample multiplied by the number of
         # samples per symbol.
-        symbol_energy = np.mean(np.abs(symbols) ** 2) * self.samples_per_symbol
+        symbol_energy = mean_sample_energy(symbols) * self.samples_per_symbol
 
         # Due to pulse shaping, we can no longer assume that each symbol has
         # unit energy.
