@@ -32,8 +32,9 @@ from utils import (
 
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
-# We need around 55 taps at Eb/N0 = 10 dB, but we can go up to 2**n - 1 without
-# increasing the overlap-save frame size, so 63 taps aren't any worse than 55.
+# At Eb/N0 = 10 dB, we need around 49 taps at 25 km, 79 taps at 50 km, and 143
+# taps at 100 km. However, we can go up to 2**n - 1 without increasing the
+# overlap-save frame size, which should be strictly better.
 CDC_TAPS = 63
 FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
@@ -183,31 +184,35 @@ def plot_cd_compensation_ber() -> None:
     Eb/N0 = 10 db (where the BER of 16-QAM over an AWGN is near 10**-3)."""
     EB_N0 = energy_db_to_lin(10)
 
-    def simulation(taps: int) -> float:
+    def simulation(fibre_length: int, taps: int) -> float:
         system = (
             Modulator16QAM(),
             PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-            ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+            ChromaticDispersion(fibre_length, SYMBOL_RATE * CHANNEL_SPS),
             Downsample(CHANNEL_SPS // RECEIVER_SPS),
             AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
-            CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, taps),
+            CDCompensator(fibre_length, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, taps),
             PulseFilter(RECEIVER_SPS, down=1),
             Downsample(RECEIVER_SPS),
             Demodulator16QAM(),
         )
-        return simulate_impl(system, 2**21)
+        return simulate_impl(system, 2**17)
 
     # We can't pickle local functions, so we can't use an executor
     # unfortunately.
-    sim_taps = np.arange(27, 73, 2)
-    sim_bers = list(map(simulation, sim_taps))
+    sim_taps = np.arange(27, 159, 2)
+    sim_bers_25 = list(map(simulation, cycle((25_000,)), sim_taps))
+    sim_bers_50 = list(map(simulation, cycle((50_000,)), sim_taps))
+    sim_bers_100 = list(map(simulation, cycle((100_000,)), sim_taps))
 
     _, ax = plt.subplots()
 
     th_ber = calculate_awgn_ber_with_16qam(np.asarray(EB_N0))
 
-    ax.plot(sim_taps, sim_bers, alpha=0.6, linewidth=2, label="Simulation", marker="o")
-    ax.hlines(th_ber, 20, 80, label="Theoretical limit", colors=["orange"])
+    ax.plot(sim_taps, sim_bers_25, alpha=0.6, linewidth=2, label="25 km", marker="o")
+    ax.plot(sim_taps, sim_bers_50, alpha=0.6, linewidth=2, label="50 km", marker="o")
+    ax.plot(sim_taps, sim_bers_100, alpha=0.6, linewidth=2, label="100 km", marker="o")
+    ax.hlines(th_ber, 20, 170, label="Theoretical limit", color="purple")
 
     ax.set_ylim(10**-3)
     ax.set_yscale("log")
