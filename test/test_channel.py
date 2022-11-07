@@ -43,10 +43,10 @@ class TestAWGN:
     def test_samples_per_symbol(samples_per_symbol: int):
         ES = 2
         ES_N0 = 3
-        SYMBOL_COUNT = 2**12
+        SYMBOL_COUNT = 2**13
 
         # Construct a train of delta functions (so each symbol has energy 2).
-        symbols = np.zeros(SYMBOL_COUNT * samples_per_symbol)
+        symbols = np.zeros(SYMBOL_COUNT * samples_per_symbol, dtype=np.cdouble)
         symbols[::samples_per_symbol] = np.sqrt(ES)
 
         assert np.isclose(signal_energy(symbols) / SYMBOL_COUNT, ES)
