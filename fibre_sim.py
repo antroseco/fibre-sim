@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from itertools import cycle
 from multiprocessing import cpu_count
-from typing import Callable, Sequence
+from typing import Callable, Sequence, overload
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -32,7 +32,9 @@ from utils import (
 
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
-CDC_TAPS = 127  # 2**n - 1 to minimize overlap-save frame size.
+# We need around 55 taps at Eb/N0 = 10 dB, but we can go up to 2**n - 1 without
+# increasing the overlap-save frame size, so 63 taps aren't any worse than 55.
+CDC_TAPS = 63
 FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
@@ -57,7 +59,17 @@ TARGET_BER = 0.5 * 10**-3
 PHYSICAL_CORES = cpu_count() // 2
 
 
+@overload
+def energy_db_to_lin(db: float) -> float:
+    ...
+
+
+@overload
 def energy_db_to_lin(db: NDArray) -> NDArray[np.float64]:
+    ...
+
+
+def energy_db_to_lin(db: float | NDArray) -> float | NDArray[np.float64]:
     return 10 ** (db / 10)
 
 
@@ -167,64 +179,40 @@ def plot_cd_compensation_fir() -> None:
 
 
 def plot_cd_compensation_ber() -> None:
-    """Replicate part of Figure 9 (simulated uncoded BER for 16-QAM data, for
-    Example 2) from the paper.
+    """Find the optimal number of taps for the CD compensation filter, at
+    Eb/N0 = 10 db (where the BER of 16-QAM over an AWGN is near 10**-3)."""
+    EB_N0 = energy_db_to_lin(10)
 
-    Parameters:
-    N = 479
-    Length = 1000 km
-    Sampling frequency = 80 GHz
-    K = 69.605
-    c = 3e8 m/s (we use the actual value)
-    D = 17 ps/nm/km
-    λ = 1553 nm (we use 1550 nm)
-    L = 2
-    ε = 1e-14 (FIXME not implemented yet)
-    """
-    N = 479
-    fibre_length = 1_000_000  # FIXME doesn't work with such long fibres.
-    sampling_freq = 80 * 10**9
-    samples_per_symbol = 2
-
-    cdc = CDCompensator(fibre_length, sampling_freq, samples_per_symbol, N)
-    assert np.isclose(cdc.K, 69.605, rtol=0.01)
-
-    def simulation(eb_n0: float) -> float:
+    def simulation(taps: int) -> float:
         system = (
             Modulator16QAM(),
             PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-            ChromaticDispersion(fibre_length, sampling_freq),
-            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, samples_per_symbol),
-            Downsample(8),
-            cdc,
-            PulseFilter(samples_per_symbol, down=1),
-            Downsample(samples_per_symbol),
+            ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+            Downsample(CHANNEL_SPS // RECEIVER_SPS),
+            AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
+            CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, taps),
+            PulseFilter(RECEIVER_SPS, down=1),
+            Downsample(RECEIVER_SPS),
             Demodulator16QAM(),
         )
-        return simulate_impl(system, 2**20)
+        return simulate_impl(system, 2**21)
 
     # We can't pickle local functions, so we can't use an executor
     # unfortunately.
-    sim_eb_n0_dbs = np.arange(10, 17)
-    sim_eb_n0s = energy_db_to_lin(sim_eb_n0_dbs)
-    bers = list(map(simulation, sim_eb_n0s))
+    sim_taps = np.arange(27, 73, 2)
+    sim_bers = list(map(simulation, sim_taps))
 
     _, ax = plt.subplots()
 
-    th_eb_n0_dbs = np.linspace(sim_eb_n0_dbs.min(), sim_eb_n0_dbs.max(), 100)
-    th_eb_n0s = energy_db_to_lin(th_eb_n0_dbs)
+    th_ber = calculate_awgn_ber_with_16qam(np.asarray(EB_N0))
 
-    th_ber_16qam = calculate_awgn_ber_with_16qam(th_eb_n0s)
+    ax.plot(sim_taps, sim_bers, alpha=0.6, linewidth=2, label="Simulation", marker="o")
+    ax.hlines(th_ber, 20, 80, label="Theoretical limit", colors=["orange"])
 
-    ax.plot(
-        th_eb_n0_dbs, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical 16-QAM"
-    )
-    ax.plot(sim_eb_n0_dbs, bers, alpha=0.6, label="Simulation", marker="*")
-
-    ax.set_ylim(10**-6)
+    ax.set_ylim(10**-3)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
-    ax.set_xlabel("$E_b/N_0$ (dB)")
+    ax.set_xlabel("CD compensation filter taps")
     ax.legend()
 
     plt.show()
