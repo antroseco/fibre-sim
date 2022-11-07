@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 
-from channel import AWGN
+from channel import AWGN, ShotNoise
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Downsample, PulseFilter
 from modulation import (
@@ -22,6 +22,7 @@ from modulation import (
 from system import build_system
 from utils import (
     Component,
+    ConstellationPlot,
     Plotter,
     SpectrumPlotter,
     calculate_awgn_ber_with_16qam,
@@ -71,13 +72,20 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 
 def default_link(es_n0: float) -> Sequence[Component]:
     return (
+        ConstellationPlot("modulated"),
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        # ConstellationPlot("tx filter"),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         Downsample(CHANNEL_SPS // RECEIVER_SPS),
-        AWGN(es_n0, RECEIVER_SPS),
+        ConstellationPlot("chromatic dispersion"),
+        ShotNoise(SYMBOL_RATE * RECEIVER_SPS, es_n0 * 2 - 20),
+        ConstellationPlot("shot noise"),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        # ConstellationPlot("cd compensation"),
         PulseFilter(RECEIVER_SPS, down=1),
+        # ConstellationPlot("matched filter"),
         Downsample(RECEIVER_SPS),
+        ConstellationPlot("final"),
     )
 
 
@@ -112,7 +120,6 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 
 
 def run_simulation(
-    p_executor: ProcessPoolExecutor,
     ber_function: Callable[[NDArray[np.float64]], NDArray[np.float64]],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
@@ -128,11 +135,12 @@ def run_simulation(
     # Magic heuristic that estimates how many samples we need to get a decent
     # BER estimate. Rounds the result to the next greatest power of 2, as we
     # will be taking the FFT of the data later.
-    lengths = [min(next_power_of_2(int(700 / i)), MAX_LENGTH) for i in expected_bers]
+    # lengths = [min(next_power_of_2(int(700 / i)), MAX_LENGTH) for i in expected_bers]
+    lengths = cycle([2**16])
 
     # TODO would be nice if this returned the iterator and the plot updated as
     # the results came in.
-    bers = list(p_executor.map(simulation, lengths, eb_n0s))
+    bers = list(map(simulation, lengths, eb_n0s))
     return eb_n0_dbs[: len(bers)], bers
 
 
@@ -242,18 +250,13 @@ def main() -> None:
         calculate_awgn_ber_with_16qam,
     )
 
-    with (
-        ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
-        ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
+    for label, marker, (eb_n0_dbs, bers) in zip(
+        labels,
+        markers,
+        map(run_simulation, ber_estimators, simulations),
     ):
-        fn = partial(run_simulation, p_executor)
-
-        for label, marker, (eb_n0_dbs, bers) in zip(
-            labels,
-            markers,
-            t_executor.map(fn, ber_estimators, simulations),
-        ):
-            ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+        print(bers)
+        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
 
     eb_n0_db = np.linspace(1, 12, 100)
     eb_n0 = energy_db_to_lin(eb_n0_db)
@@ -267,7 +270,7 @@ def main() -> None:
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
-    ax.set_xlabel("$E_b/N_0$ (dB)")
+    # ax.set_xlabel("$E_b/N_0$ (dB)")
     ax.legend()
 
     plt.show()
@@ -275,3 +278,30 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+    exit(0)
+
+    signal = np.asarray([1, 1, -1, -1])
+    noisy = ShotNoise(SYMBOL_RATE * RECEIVER_SPS, -20)(signal)
+
+    # plt.stem(signal)
+    plt.stem(np.real(noisy))
+    plt.show()
+
+    print(signal)
+    print(noisy)
+
+    assert np.all(signal != noisy)
+
+    exit(0)
+    from scipy.stats import norm, poisson
+
+    mu = 390
+    x = np.arange(poisson.ppf(0.01, mu), poisson.ppf(0.99, mu))
+
+    fig, ax = plt.subplots()
+    ax.stem(x, poisson.pmf(x, mu), "bo", label="poisson pmf")
+    ax.plot(x, norm.pdf(x, mu, np.sqrt(mu)), label="normal approximation")
+    ax.legend()
+
+    plt.show()

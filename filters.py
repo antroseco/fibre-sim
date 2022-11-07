@@ -158,9 +158,6 @@ class CDBase(Component):
     # Systems.
     GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)
 
-    # Carrier wavelength = 1550 nm.
-    WAVELENGTH = 1550e-9
-
     def __init__(self, length: float, sampling_rate: float) -> None:
         super().__init__()
 

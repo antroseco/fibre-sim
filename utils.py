@@ -10,6 +10,9 @@ class Component(ABC):
     input_type = None
     output_type = None
 
+    # Carrier wavelength = 1550 nm.
+    WAVELENGTH = 1550e-9
+
     @abstractmethod
     def __call__(self, data: NDArray) -> NDArray:
         pass
@@ -37,6 +40,24 @@ class SpectrumPlotter(Component):
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         _, ax = plt.subplots()
         ax.magnitude_spectrum(symbols.tolist())
+        plt.show()
+
+        return symbols
+
+
+class ConstellationPlot(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __init__(self, title: str) -> None:
+        super().__init__()
+
+        self.title = title
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        _, ax = plt.subplots()
+        ax.scatter(np.real(symbols[:1024]), np.imag(symbols[:1024]))
+        plt.title(self.title)
         plt.show()
 
         return symbols
@@ -138,9 +159,13 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
     return y
 
 
+def sample_energies(signal: NDArray) -> NDArray:
+    return np.real(np.conj(signal) * signal)
+
+
 def signal_energy(signal: NDArray) -> float:
-    return np.sum(np.real(np.conj(signal) * signal))
+    return np.sum(sample_energies(signal))
 
 
 def mean_sample_energy(signal: NDArray) -> float:
-    return np.mean(np.real(np.conj(signal) * signal))
+    return np.mean(sample_energies(signal))
