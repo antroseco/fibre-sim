@@ -77,7 +77,8 @@ class PulseFilter(Component):
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
 
-        # Perform any {up, down}sampling first.
+        # To avoid aliasing, filtering should be done after upsamlping but
+        # before downsampling.
         if self.up:
             symbols = self.upsample(symbols)
 
@@ -88,6 +89,7 @@ class PulseFilter(Component):
             # Should subsample after filtering to avoid aliasing.
             filtered = self.subsample(filtered)
             new_sps = self.samples_per_symbol // self.down
+
             # Remove RRC filter edge effects.
             return filtered[self.SPAN * new_sps : -(self.SPAN - 1) * new_sps]
 
