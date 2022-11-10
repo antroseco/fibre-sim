@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import Downsample, PulseFilter
+from filters import Decimate, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -180,7 +180,7 @@ class TestIntegration:
         config = (
             Modulator16QAM(),
             PulseFilter(channel_sps, up=channel_sps),
-            Downsample(2),
+            Decimate(2),
             # Noise applied at the receiver.
             AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, receiver_sps),
             # PulseFilter filters at receiver_sps and then subsamples to 1 SpS.
