@@ -172,16 +172,19 @@ class TestIntegration:
         assert np.isclose(self.energy_sensor.mean, 1, atol=1e-3)
 
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
-    @pytest.mark.parametrize("samples_per_symbol", [2, 4, 8, 16])
-    def test_16qam_with_pulse_shaping(self, eb_n0: float, samples_per_symbol: int):
+    @pytest.mark.parametrize("channel_sps", [4, 8, 16, 32])
+    def test_16qam_with_pulse_shaping(self, eb_n0: float, channel_sps: int):
         LENGTH = 2**17
+        receiver_sps = channel_sps // 2
 
         config = (
             Modulator16QAM(),
-            PulseFilter(samples_per_symbol, up=samples_per_symbol),
-            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, 2),
-            PulseFilter(2, down=samples_per_symbol // 2),
+            PulseFilter(channel_sps, up=channel_sps),
             Downsample(2),
+            # Noise applied at the receiver.
+            AWGN(eb_n0 * Modulator16QAM.bits_per_symbol, receiver_sps),
+            # PulseFilter filters at receiver_sps and then subsamples to 1 SpS.
+            PulseFilter(receiver_sps, down=receiver_sps),
             Demodulator16QAM(),
         )
         system = build_system(PseudoRandomStream(), config)

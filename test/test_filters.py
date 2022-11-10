@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from filters import ChromaticDispersion, PulseFilter, root_raised_cosine
-from utils import signal_energy
+from utils import normalize_energy, signal_energy
 
 # TODO
 # test for unit energy
@@ -128,7 +128,6 @@ class TestPulseFilter:
     @pytest.mark.parametrize("samples_per_symbol", (2, 4, 8, 16))
     def test_round_trip(samples_per_symbol: int):
         LENGTH = 2**10
-        DOWN_SPS = 2
         rng = np.random.default_rng()
 
         real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
@@ -142,14 +141,16 @@ class TestPulseFilter:
         # PulseFilter() keeps boundary effects when upsampling.
         assert up.size == (data.size + PulseFilter.SPAN - 1) * samples_per_symbol
 
-        down = PulseFilter(DOWN_SPS, down=samples_per_symbol // DOWN_SPS)(up)
+        # Data is first filtered at its original rate and then it's subsampled
+        # to 1 SpS.
+        down = PulseFilter(samples_per_symbol, down=samples_per_symbol)(up)
 
         assert down.ndim == 1
         assert down.dtype == np.cdouble
-        assert down.size == data.size * DOWN_SPS
+        assert down.size == data.size
 
-        # Downsample again to 1 sample per symbol.
-        assert np.allclose(down[::DOWN_SPS], data, atol=0.01)
+        # Energy need not be preserved.
+        assert np.allclose(normalize_energy(down), normalize_energy(data), atol=0.01)
 
 
 class TestChromaticDispersion:

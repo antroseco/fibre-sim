@@ -89,8 +89,7 @@ def default_link(es_n0: float) -> Sequence[Component]:
         Downsample(CHANNEL_SPS // RECEIVER_SPS),
         AWGN(es_n0, RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
-        PulseFilter(RECEIVER_SPS, down=1),
-        Downsample(RECEIVER_SPS),
+        PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
     )
 
 

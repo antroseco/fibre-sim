@@ -40,10 +40,10 @@ class PulseFilter(Component):
 
         # It doesn't make sense to set both.
         if up is not None:
-            assert up > 0
+            assert up > 1
             assert down is None
         if down is not None:
-            assert down > 0
+            assert down > 1
             assert up is None
 
         self.up = up
@@ -67,17 +67,14 @@ class PulseFilter(Component):
 
         return upsampled
 
-    def downsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+    def subsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert self.down is not None
         assert symbols.size > 0
-        assert symbols.size % self.down == 0
 
         if self.down == 1:
             return symbols
 
-        # Don't bother copying to a new array. Also don't bother running it
-        # through a low-pass filter, as the actual ADC wouldn't know about the
-        # rest of the samples.
+        # Don't bother copying to a new array.
         downsampled = symbols[:: self.down]
 
         original_energy = signal_energy(symbols)
@@ -85,6 +82,7 @@ class PulseFilter(Component):
 
         # Preserve signal energy. This is crucial if we want the matched filter
         # to work without any external normalization.
+        # FIXME move normalization to the demodulator.
         return downsampled * np.sqrt(original_energy / downsampled_energy)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
@@ -93,20 +91,16 @@ class PulseFilter(Component):
         # Perform any {up, down}sampling first.
         if self.up:
             symbols = self.upsample(symbols)
-        if self.down:
-            symbols = self.downsample(symbols)
 
         # Filter the data with the impulse response of the filter.
         filtered = overlap_save(self.impulse_response, symbols, full=True)
 
         if self.down:
-            # FIXME document this.
-            return filtered[
-                self.SPAN
-                * self.samples_per_symbol : -(self.SPAN - 1)
-                * self.samples_per_symbol
-                + 1
-            ]
+            # Should subsample after filtering to avoid aliasing.
+            filtered = self.subsample(filtered)
+            new_sps = self.samples_per_symbol // self.down
+            # Remove RRC filter edge effects.
+            return filtered[self.SPAN * new_sps : -(self.SPAN - 1) * new_sps]
 
         # Transmit the symbols as is.
         return filtered
