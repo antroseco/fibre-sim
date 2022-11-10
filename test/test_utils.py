@@ -10,6 +10,7 @@ from utils import (
     is_power_of_2,
     mean_sample_energy,
     next_power_of_2,
+    normalize_energy,
     overlap_save,
     signal_energy,
 )
@@ -144,3 +145,18 @@ class TestEnergy:
         assert np.isfinite(energy)
         assert energy >= 0
         assert np.isclose(energy, amplitude**2)
+
+    @staticmethod
+    def test_normalize_energy():
+        LENGTH = 128
+
+        signal = np.full(LENGTH, 3 + 3j)
+        normalized = normalize_energy(signal)
+
+        assert normalized.dtype == signal.dtype
+        assert normalized.ndim == signal.ndim
+        assert normalized.size == signal.size
+        assert np.all(np.isfinite(normalized))
+
+        # Signal energy must be 1.
+        assert np.isclose(signal_energy(normalized), 1)

@@ -144,3 +144,7 @@ def signal_energy(signal: NDArray) -> float:
 
 def mean_sample_energy(signal: NDArray) -> float:
     return np.mean(np.real(np.conj(signal) * signal))
+
+
+def normalize_energy(signal: NDArray) -> NDArray:
+    return signal / np.sqrt(signal_energy(signal))
