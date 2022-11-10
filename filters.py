@@ -71,19 +71,8 @@ class PulseFilter(Component):
         assert self.down is not None
         assert symbols.size > 0
 
-        if self.down == 1:
-            return symbols
-
         # Don't bother copying to a new array.
-        downsampled = symbols[:: self.down]
-
-        original_energy = signal_energy(symbols)
-        downsampled_energy = signal_energy(downsampled)
-
-        # Preserve signal energy. This is crucial if we want the matched filter
-        # to work without any external normalization.
-        # FIXME move normalization to the demodulator.
-        return downsampled * np.sqrt(original_energy / downsampled_energy)
+        return symbols[:: self.down]
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert symbols.ndim == 1
