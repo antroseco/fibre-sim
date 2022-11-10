@@ -22,8 +22,7 @@ from modulation import (
 from system import build_system
 from utils import (
     Component,
-    Plotter,
-    SpectrumPlotter,
+    PlotSignal,
     calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
     is_power_of_2,

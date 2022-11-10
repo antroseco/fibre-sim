@@ -15,31 +15,51 @@ class Component(ABC):
         pass
 
 
-class Plotter(Component):
+class PlotSignal(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
-    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        _, ax = plt.subplots()
-        ax.stem(np.real(data[:64]), markerfmt="bo", label="In-phase")
-        ax.stem(np.imag(data[:64]), markerfmt="go", label="Quadrature")
-        ax.legend()
+    def __call__(self, data: NDArray) -> NDArray:
+        assert data.ndim == 1
+        assert data.size > 0
+
+        s_real = np.real(data[:1024])
+        s_imag = np.imag(data[:1024])
+
+        _, axs = plt.subplots(nrows=2, ncols=3)
+
+        # Constellation diagram.
+        ax = axs[0][0]
+        ax.scatter(s_real, s_imag)
+        ax.set_xlabel("In-phase")
+        ax.set_ylabel("Quadrature")
+        ax.axhline(color="black")
+        ax.axvline(color="black")
+
+        # Unused plot.
+        axs[1][0].set_axis_off()
+
+        # Signal (real component).
+        ax = axs[0][1]
+        ax.stem(s_real)
+        ax.set_xlim(-4, 64)
+        ax.set_xlabel("Sample")
+        ax.set_ylabel("In-phase")
+
+        # Signal (imaginary component).
+        ax = axs[1][1]
+        ax.stem(s_imag)
+        ax.set_xlim(-4, 64)
+        ax.set_xlabel("Sample")
+        ax.set_ylabel("Quadrature")
+
+        # Spectrum.
+        axs[0][2].magnitude_spectrum(data.tolist(), sides="twosided")
+        axs[1][2].phase_spectrum(data.tolist(), sides="twosided")
+
         plt.show()
-        # FIXME this shows all figures...
-        # FIXME need to close the figure after we're done with it.
+
         return data
-
-
-class SpectrumPlotter(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        _, ax = plt.subplots()
-        ax.magnitude_spectrum(symbols.tolist())
-        plt.show()
-
-        return symbols
 
 
 def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
