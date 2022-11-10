@@ -3,6 +3,7 @@ from abc import abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
+from laser import Laser
 from utils import Component
 
 
@@ -181,3 +182,33 @@ class Demodulator16QAM(Demodulator):
         data[2::4], data[3::4] = self.impl(np.real(symbols), scale)
 
         return data
+
+
+class IQModulator(Component):
+    input_type = "cd symbols"
+    output_type = "cd electric field"
+
+    def __init__(self, laser: Laser) -> None:
+        super().__init__()
+
+        self.laser = laser
+
+    def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert voltages.ndim == 1
+        assert voltages.size > 0
+
+        # Input voltage should range from -Vπ to +Vπ. Remove this restriction
+        # from the caller by inferring Vπ.
+        Vpi = max(np.max(np.abs(np.real(voltages))), np.max(np.abs(np.imag(voltages))))
+
+        # FIXME increase Vpi to make the cosine function looks more linear. Is
+        # there a better way to do this?
+        Vpi *= 1.35
+
+        # Add the DC bias of -Vπ, and divide by Vπ, which is 1.
+        phi = (voltages - Vpi) * (np.pi / Vpi)
+
+        Efield = 0.5 * self.laser(voltages.size)
+        Efield *= np.cos(np.real(phi) / 2) + 1j * np.sin(np.imag(phi) / 2)
+
+        return Efield
