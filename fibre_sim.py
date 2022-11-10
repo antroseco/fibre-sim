@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from channel import AWGN
 from data_stream import PseudoRandomStream
-from filters import CDCompensator, ChromaticDispersion, Downsample, PulseFilter
+from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -85,7 +85,7 @@ def default_link(es_n0: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        Downsample(CHANNEL_SPS // RECEIVER_SPS),
+        Decimate(CHANNEL_SPS // RECEIVER_SPS),
         AWGN(es_n0, RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
         PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
@@ -187,11 +187,11 @@ def plot_cd_compensation_ber() -> None:
             Modulator16QAM(),
             PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
             ChromaticDispersion(fibre_length, SYMBOL_RATE * CHANNEL_SPS),
-            Downsample(CHANNEL_SPS // RECEIVER_SPS),
+            Decimate(CHANNEL_SPS // RECEIVER_SPS),
             AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
             CDCompensator(fibre_length, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, taps),
             PulseFilter(RECEIVER_SPS, down=1),
-            Downsample(RECEIVER_SPS),
+            Decimate(RECEIVER_SPS),
             Demodulator16QAM(),
         )
         return simulate_impl(system, 2**17)

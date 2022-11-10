@@ -5,6 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import speed_of_light
 from scipy.linalg import toeplitz
+from scipy.signal import decimate
 from scipy.special import erf
 
 from utils import Component, overlap_save, signal_energy
@@ -253,7 +254,7 @@ class CDCompensator(CDBase):
         ]
 
 
-class Downsample(Component):
+class Decimate(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
 
@@ -264,5 +265,18 @@ class Downsample(Component):
         self.factor = factor
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        # FIXME should we normalize the energy here?
-        return symbols[:: self.factor]
+        # To prevent aliasing, a low-pass filter needs to be applied before
+        # downsampling. In the real implementation, this could be done with an
+        # analogue filter followed by sampling at the desired rate. Here, we
+        # could do it by designing a low-pass FIR filter using the window method
+        # with scipy.signal.firwin(), filtering the data ourselves, and finally
+        # subsampling the signal---but for now it's easier to let
+        # scipy.signal.decimate() do everything for us. By default, it runs an
+        # IIR filter both forwards and backwards to ensure zero phase change.
+        # TODO implement a more computationally efficient FIR method (should
+        # only calculate the samples that we'll keep).
+        # XXX the astype() call just makes the type checker happy; it's not
+        # supposed to do anything.
+        return decimate(symbols, self.factor).astype(
+            np.cdouble, casting="no", copy=False
+        )
