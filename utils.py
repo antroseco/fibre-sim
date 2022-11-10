@@ -11,6 +11,9 @@ class Component(ABC):
     input_type = None
     output_type = None
 
+    # Carrier wavelength = 1550 nm.
+    WAVELENGTH = 1550e-9
+
     @abstractmethod
     def __call__(self, data: NDArray) -> NDArray:
         pass
