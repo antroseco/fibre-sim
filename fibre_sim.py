@@ -21,6 +21,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
+from receiver import OpticalFrontEnd
 from system import build_system
 from utils import (
     Component,
@@ -75,6 +76,7 @@ def default_link(es_n0: float) -> Sequence[Component]:
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        OpticalFrontEnd(),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
         AWGN(es_n0, RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
