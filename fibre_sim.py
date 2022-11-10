@@ -190,8 +190,7 @@ def plot_cd_compensation_ber() -> None:
             Decimate(CHANNEL_SPS // RECEIVER_SPS),
             AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
             CDCompensator(fibre_length, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, taps),
-            PulseFilter(RECEIVER_SPS, down=1),
-            Decimate(RECEIVER_SPS),
+            PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
             Demodulator16QAM(),
         )
         return simulate_impl(system, 2**17)
