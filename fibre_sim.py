@@ -73,7 +73,7 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 def default_link(es_n0: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(ContinuousWaveLaser()),
+        IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
         AWGN(es_n0, RECEIVER_SPS),
