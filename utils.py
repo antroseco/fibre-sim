@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import overload
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -168,3 +169,17 @@ def mean_sample_energy(signal: NDArray) -> float:
 
 def normalize_energy(signal: NDArray) -> NDArray:
     return signal / np.sqrt(signal_energy(signal))
+
+
+@overload
+def energy_db_to_lin(db: float) -> float:
+    ...
+
+
+@overload
+def energy_db_to_lin(db: NDArray) -> NDArray[np.float64]:
+    ...
+
+
+def energy_db_to_lin(db: float | NDArray) -> float | NDArray[np.float64]:
+    return 10 ** (db / 10)

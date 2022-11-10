@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from itertools import cycle
 from multiprocessing import cpu_count
-from typing import Callable, Sequence, overload
+from typing import Callable, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -11,22 +11,23 @@ from numpy.typing import NDArray
 from channel import AWGN
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
+from laser import ContinuousWaveLaser
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
+    IQModulator,
     Modulator16QAM,
     ModulatorBPSK,
     ModulatorQPSK,
-    IQModulator,
 )
-from laser import ContinuousWaveLaser
 from system import build_system
 from utils import (
     Component,
     PlotSignal,
     calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
+    energy_db_to_lin,
     is_power_of_2,
     next_power_of_2,
 )
@@ -59,20 +60,6 @@ TARGET_BER = 0.5 * 10**-3
 #
 # Therefore we should divide by 2 to avoid scheduling two processes on one core.
 PHYSICAL_CORES = cpu_count() // 2
-
-
-@overload
-def energy_db_to_lin(db: float) -> float:
-    ...
-
-
-@overload
-def energy_db_to_lin(db: NDArray) -> NDArray[np.float64]:
-    ...
-
-
-def energy_db_to_lin(db: float | NDArray) -> float | NDArray[np.float64]:
-    return 10 ** (db / 10)
 
 
 def simulate_impl(system: Sequence[Component], length: int) -> float:
