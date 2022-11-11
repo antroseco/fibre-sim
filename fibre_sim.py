@@ -207,6 +207,7 @@ def plot_cd_compensation_ber() -> None:
     ax.set_yscale("log")
     ax.set_ylabel("BER")
     ax.set_xlabel("CD compensation filter taps")
+    ax.set_title("At $E_b/N_0 = 10$ dB")
     ax.legend()
 
     plt.show()
