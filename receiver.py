@@ -13,8 +13,13 @@ class OpticalFrontEnd(Component):
 
     @cached_property
     def responsivity(self) -> float:
-        # TODO what is a reasonable value for the quantum efficiency?
-        efficiency = 0.6
+        # Responsivity is around 0.688 A/W. This seems like a reasonable value;
+        # photodetectors with greater responsivities have been demonstrated
+        # (e.g. Young-Ho Ko, Joong-Seon Choe, Won Seok Han, Seo-Young Lee,
+        # Young-Tak Han, Hyun-Do Jung, Chun Ju Youn, Jong-Hoi Kim, and Yongsoon
+        # Baek, "High-speed waveguide photodetector for 64 Gbaud coherent
+        # receiver," Opt. Lett. 43, 579-582 (2018) measured 0.73 A/W).
+        efficiency = 0.55
         return (
             efficiency * elementary_charge * self.WAVELENGTH / (Planck * speed_of_light)
         )
