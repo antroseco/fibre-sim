@@ -162,12 +162,16 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
     return y
 
 
+def samples_squared(signal: NDArray) -> NDArray[np.float64]:
+    return np.real(np.conj(signal) * signal)
+
+
 def signal_energy(signal: NDArray) -> float:
-    return np.sum(np.real(np.conj(signal) * signal))
+    return np.sum(samples_squared(signal))
 
 
 def mean_sample_energy(signal: NDArray) -> float:
-    return np.mean(np.real(np.conj(signal) * signal))
+    return np.mean(samples_squared(signal))
 
 
 def normalize_energy(signal: NDArray) -> NDArray:
