@@ -190,4 +190,4 @@ def energy_db_to_lin(db: float | NDArray) -> float | NDArray[np.float64]:
 
 
 def power_dbm_to_lin(dbm: float) -> float:
-    return 1e-3 * energy_db_to_lin(dbm)
+    return energy_db_to_lin(dbm - 30)

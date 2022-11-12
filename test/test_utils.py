@@ -4,15 +4,17 @@ from typing import Sequence
 import numpy as np
 import pytest
 from scipy.signal import convolve, lfilter
+
 from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     is_power_of_2,
-    signal_power,
     next_power_of_2,
     normalize_energy,
     overlap_save,
+    power_dbm_to_lin,
     signal_energy,
+    signal_power,
 )
 
 
@@ -160,3 +162,14 @@ class TestEnergy:
 
         # Signal energy must be 1.
         assert np.isclose(signal_energy(normalized), 1)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "dBm,expected",
+        ((-10, 0.0001), (-5, 0.00031622776602), (0, 0.001), (42, 15.848931925)),
+    )
+    def test_power_dbm_to_lin(dBm: float, expected: float):
+        result = power_dbm_to_lin(dBm)
+
+        assert np.isfinite(result)
+        assert np.isclose(result, expected)
