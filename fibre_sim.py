@@ -21,7 +21,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from receiver import OpticalFrontEnd
+from receiver import NoisyOpticalFrontEnd
 from system import build_system
 from utils import (
     Component,
@@ -31,6 +31,8 @@ from utils import (
     is_power_of_2,
     next_power_of_2,
     plot_signal,
+    signal_energy,
+    signal_power,
 )
 
 CHANNEL_SPS = 16
@@ -63,6 +65,10 @@ TARGET_BER = 0.5 * 10**-3
 PHYSICAL_CORES = cpu_count() // 2
 
 
+def print_energy(comp: str, data: NDArray) -> None:
+    print(comp, signal_energy(data), signal_power(data))
+
+
 def simulate_impl(system: Sequence[Component], length: int) -> float:
     # We take the FFT of the modulated data, so it's best that the data is a
     # power of 2.
@@ -76,9 +82,8 @@ def default_link(es_n0: float) -> Sequence[Component]:
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        OpticalFrontEnd(),
+        NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS, -20 + 2 * es_n0),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
-        AWGN(es_n0, RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
         PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
     )
@@ -120,7 +125,7 @@ def run_simulation(
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
     MAX_LENGTH = 2**24  # 16,777,216
-    MAX_EB_N0_DB = 12
+    MAX_EB_N0_DB = 6
 
     eb_n0_dbs = np.arange(1, MAX_EB_N0_DB + 1)
     eb_n0s = energy_db_to_lin(eb_n0_dbs)
@@ -262,4 +267,5 @@ def main(concurrent: bool = True) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(False)
+    # main()
