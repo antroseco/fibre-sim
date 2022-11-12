@@ -25,12 +25,12 @@ from receiver import OpticalFrontEnd
 from system import build_system
 from utils import (
     Component,
-    PlotSignal,
     calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
     energy_db_to_lin,
     is_power_of_2,
     next_power_of_2,
+    plot_signal,
 )
 
 CHANNEL_SPS = 16

@@ -19,51 +19,46 @@ class Component(ABC):
         pass
 
 
-class PlotSignal(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
+def plot_signal(component: str, signal: NDArray) -> None:
+    assert signal.ndim == 1
+    assert signal.size > 0
 
-    def __call__(self, data: NDArray) -> NDArray:
-        assert data.ndim == 1
-        assert data.size > 0
+    s_real = np.real(signal[:1024])
+    s_imag = np.imag(signal[:1024])
 
-        s_real = np.real(data[:1024])
-        s_imag = np.imag(data[:1024])
+    fig, axs = plt.subplots(nrows=2, ncols=3)
+    fig.suptitle(f"After {component}")
 
-        _, axs = plt.subplots(nrows=2, ncols=3)
+    # Constellation diagram.
+    ax = axs[0][0]
+    ax.scatter(s_real, s_imag)
+    ax.set_xlabel("In-phase")
+    ax.set_ylabel("Quadrature")
+    ax.axhline(color="black")
+    ax.axvline(color="black")
 
-        # Constellation diagram.
-        ax = axs[0][0]
-        ax.scatter(s_real, s_imag)
-        ax.set_xlabel("In-phase")
-        ax.set_ylabel("Quadrature")
-        ax.axhline(color="black")
-        ax.axvline(color="black")
+    # Unused plot.
+    axs[1][0].set_axis_off()
 
-        # Unused plot.
-        axs[1][0].set_axis_off()
+    # Signal (real component).
+    ax = axs[0][1]
+    ax.stem(s_real)
+    ax.set_xlim(-4, 512)
+    ax.set_xlabel("Sample")
+    ax.set_ylabel("In-phase")
 
-        # Signal (real component).
-        ax = axs[0][1]
-        ax.stem(s_real)
-        ax.set_xlim(-4, 512)
-        ax.set_xlabel("Sample")
-        ax.set_ylabel("In-phase")
+    # Signal (imaginary component).
+    ax = axs[1][1]
+    ax.stem(s_imag)
+    ax.set_xlim(-4, 512)
+    ax.set_xlabel("Sample")
+    ax.set_ylabel("Quadrature")
 
-        # Signal (imaginary component).
-        ax = axs[1][1]
-        ax.stem(s_imag)
-        ax.set_xlim(-4, 512)
-        ax.set_xlabel("Sample")
-        ax.set_ylabel("Quadrature")
+    # Spectrum.
+    axs[0][2].magnitude_spectrum(signal.tolist(), sides="twosided")
+    axs[1][2].phase_spectrum(signal.tolist(), sides="twosided")
 
-        # Spectrum.
-        axs[0][2].magnitude_spectrum(data.tolist(), sides="twosided")
-        axs[1][2].phase_spectrum(data.tolist(), sides="twosided")
-
-        plt.show()
-
-        return data
+    plt.show()
 
 
 def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
