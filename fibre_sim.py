@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from itertools import cycle
 from multiprocessing import cpu_count
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -115,7 +115,7 @@ def simulate_16qam(length: int, eb_n0: float) -> float:
 
 
 def run_simulation(
-    p_executor: ProcessPoolExecutor,
+    p_executor: Optional[ProcessPoolExecutor],
     ber_function: Callable[[NDArray[np.float64]], NDArray[np.float64]],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
@@ -135,7 +135,11 @@ def run_simulation(
 
     # TODO would be nice if this returned the iterator and the plot updated as
     # the results came in.
-    bers = list(p_executor.map(simulation, lengths, eb_n0s))
+    bers = list(
+        p_executor.map(simulation, lengths, eb_n0s)
+        if p_executor
+        else map(simulation, lengths, eb_n0s)
+    )
     return eb_n0_dbs[: len(bers)], bers
 
 
@@ -213,7 +217,7 @@ def plot_cd_compensation_ber() -> None:
     plt.show()
 
 
-def main() -> None:
+def main(concurrent: bool = True) -> None:
     _, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
@@ -225,18 +229,19 @@ def main() -> None:
         calculate_awgn_ber_with_16qam,
     )
 
-    with (
-        ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
-        ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
-    ):
-        fn = partial(run_simulation, p_executor)
-
-        for label, marker, (eb_n0_dbs, bers) in zip(
-            labels,
-            markers,
-            t_executor.map(fn, ber_estimators, simulations),
+    if concurrent:
+        with (
+            ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
+            ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
         ):
-            ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+            fn = partial(run_simulation, p_executor)
+            sim_results = t_executor.map(fn, ber_estimators, simulations)
+    else:
+        fn = partial(run_simulation, None)
+        sim_results = map(fn, ber_estimators, simulations)
+
+    for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
+        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
 
     eb_n0_db = np.linspace(1, 12, 100)
     eb_n0 = energy_db_to_lin(eb_n0_db)
