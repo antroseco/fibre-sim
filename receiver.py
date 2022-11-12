@@ -60,13 +60,13 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
         # Take the noise bandwidth as the Nyquist frequency.
         B_n = self.sampling_rate / 2
-        noise_stdev = np.sqrt(
+        shot_noise_stdev = np.sqrt(
             2 * elementary_charge * self.responsivity * self.lo_power * B_n
         )
-        noise_r = self.rng.normal(0, noise_stdev, size=current.size)
-        noise_i = self.rng.normal(0, noise_stdev, size=current.size)
+        shot_noise_r = self.rng.normal(0, shot_noise_stdev, size=current.size)
+        shot_noise_i = self.rng.normal(0, shot_noise_stdev, size=current.size)
 
-        current += noise_r
-        current += 1j * noise_i
+        current += shot_noise_r
+        current += 1j * shot_noise_i
 
         return current
