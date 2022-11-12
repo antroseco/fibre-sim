@@ -2,9 +2,9 @@ from functools import cached_property
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.constants import Planck, elementary_charge, speed_of_light
+from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
-from utils import Component, signal_power, power_dbm_to_lin
+from utils import Component, power_dbm_to_lin, signal_power
 
 
 class OpticalFrontEnd(Component):
@@ -59,14 +59,22 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
 
         # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
         # Take the noise bandwidth as the Nyquist frequency.
-        B_n = self.sampling_rate / 2
+        B_N = self.sampling_rate / 2
         shot_noise_stdev = np.sqrt(
-            2 * elementary_charge * self.responsivity * self.lo_power * B_n
+            2 * elementary_charge * self.responsivity * self.lo_power * B_N
         )
         shot_noise_r = self.rng.normal(0, shot_noise_stdev, size=current.size)
         shot_noise_i = self.rng.normal(0, shot_noise_stdev, size=current.size)
 
         current += shot_noise_r
         current += 1j * shot_noise_i
+
+        # Thermal noise has σ2 = 4*k_B*T*B_N/R_L. FIXME what should R_L be?
+        thermal_noise_stdev = np.sqrt(4 * Boltzmann * 293 * B_N)
+        thermal_noise_r = self.rng.normal(0, thermal_noise_stdev, size=current.size)
+        thermal_noise_i = self.rng.normal(0, thermal_noise_stdev, size=current.size)
+
+        current += thermal_noise_r
+        current += 1j * thermal_noise_i
 
         return current
