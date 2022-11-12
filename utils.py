@@ -31,7 +31,7 @@ def plot_signal(component: str, signal: NDArray) -> None:
 
     # Constellation diagram.
     ax = axs[0][0]
-    ax.scatter(s_real, s_imag)
+    ax.scatter(s_real, s_imag, alpha=0.2)
     ax.set_xlabel("In-phase")
     ax.set_ylabel("Quadrature")
     ax.axhline(color="black")
