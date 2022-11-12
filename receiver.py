@@ -11,6 +11,9 @@ class OpticalFrontEnd(Component):
     input_type = "cd electric field"
     output_type = "cd symbols"
 
+    lo_power = power_dbm_to_lin(10)  # 10 dBm is the max for Class 1 lasers.
+    lo_amplitude = np.sqrt(lo_power)  # Signal power is the mean sample squared.
+
     @cached_property
     def responsivity(self) -> float:
         # Responsivity is around 0.688 A/W. This seems like a reasonable value;
@@ -33,7 +36,7 @@ class OpticalFrontEnd(Component):
         # to multiply by the responsivity to get the photocurrent.
         # TODO implement intradyne detection.
         # TODO what is a reasonable local oscillator amplitude?
-        return Efields * self.responsivity
+        return self.responsivity * self.lo_amplitude * Efields
 
 
 class NoisyOpticalFrontEnd(OpticalFrontEnd):
@@ -59,13 +62,10 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
     def photodiode_incident_energy(
         self, A_r: NDArray[np.float64], phi_r: NDArray[np.float64], lo_phase: float
     ) -> NDArray[np.float64]:
-        LO_POWER = power_dbm_to_lin(10)  # 10 dBm is the max for Class 1 lasers.
-        LO_AMPLITUDE = np.sqrt(LO_POWER / self.sampling_rate)
-
         energies = (
             A_r**2
-            + LO_AMPLITUDE**2
-            + 2 * A_r * LO_AMPLITUDE * np.cos(phi_r - lo_phase)
+            + self.lo_amplitude**2
+            + 2 * A_r * self.lo_amplitude * np.cos(phi_r - lo_phase)
         )
 
         return energies / 4
