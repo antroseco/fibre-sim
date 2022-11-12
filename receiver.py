@@ -35,7 +35,6 @@ class OpticalFrontEnd(Component):
         # homodyne detection to maintain the baseband represtation, we just have
         # to multiply by the responsivity to get the photocurrent.
         # TODO implement intradyne detection.
-        # TODO what is a reasonable local oscillator amplitude?
         return self.responsivity * self.lo_amplitude * Efields
 
 
