@@ -46,14 +46,14 @@ class PlotSignal(Component):
         # Signal (real component).
         ax = axs[0][1]
         ax.stem(s_real)
-        ax.set_xlim(-4, 64)
+        ax.set_xlim(-4, 512)
         ax.set_xlabel("Sample")
         ax.set_ylabel("In-phase")
 
         # Signal (imaginary component).
         ax = axs[1][1]
         ax.stem(s_imag)
-        ax.set_xlim(-4, 64)
+        ax.set_xlim(-4, 512)
         ax.set_xlabel("Sample")
         ax.set_ylabel("Quadrature")
 
