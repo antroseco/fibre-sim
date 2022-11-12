@@ -166,11 +166,13 @@ def samples_squared(signal: NDArray) -> NDArray[np.float64]:
     return np.real(np.conj(signal) * signal)
 
 
-def signal_energy(signal: NDArray) -> float:
-    return np.sum(samples_squared(signal))
+def signal_energy(signal: NDArray, sampling_interval: float = 1) -> float:
+    # Energy is proportional to the time between samples.
+    return sampling_interval * np.sum(samples_squared(signal))
 
 
-def mean_sample_energy(signal: NDArray) -> float:
+def signal_power(signal: NDArray) -> float:
+    # Power is simply the mean squared sample. Time cancels out.
     return np.mean(samples_squared(signal))
 
 

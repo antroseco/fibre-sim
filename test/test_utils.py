@@ -8,7 +8,7 @@ from utils import (
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     is_power_of_2,
-    mean_sample_energy,
+    signal_power,
     next_power_of_2,
     normalize_energy,
     overlap_save,
@@ -140,7 +140,7 @@ class TestEnergy:
         LENGTH = 16
 
         signal = np.full(LENGTH, amplitude)
-        energy = mean_sample_energy(signal)
+        energy = signal_power(signal)
 
         assert np.isfinite(energy)
         assert energy >= 0
