@@ -1,5 +1,7 @@
 from functools import reduce
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
+
+from numpy.typing import NDArray
 
 from data_stream import DataStream
 from utils import Component
@@ -20,19 +22,28 @@ def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -
 
 
 def build_system(
-    data_stream: DataStream, components: Sequence[Component]
+    data_stream: DataStream,
+    components: Sequence[Component],
+    inspector: Optional[Callable[[str, NDArray], None]] = None,
 ) -> Callable[[int], int]:
     # FIXME need to update everything to work with the "cd electric field" type.
     # typecheck_system(data_stream, components)
+
+    def reduce_fn(x: NDArray, component: Component) -> NDArray:
+        y = component(x)
+
+        # Call inspector in between components.
+        if inspector:
+            inspector(type(component).__name__, y)
+
+        return y
 
     def simulate_system(bit_count: int) -> int:
         while bit_count:
             chunk_size = min(bit_count, MAX_CHUNK_SIZE)
 
             channel_output = reduce(
-                lambda data, comp: comp(data),
-                components,
-                data_stream.generate(chunk_size),
+                reduce_fn, components, data_stream.generate(chunk_size)
             )
             data_stream.validate(channel_output)
 
