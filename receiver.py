@@ -57,24 +57,19 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         # Noise-less current.
         current = super().__call__(Efields)
 
-        # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
         # Take the noise bandwidth as the Nyquist frequency.
         B_N = self.sampling_rate / 2
-        shot_noise_stdev = np.sqrt(
-            2 * elementary_charge * self.responsivity * self.lo_power * B_N
-        )
-        shot_noise_r = self.rng.normal(0, shot_noise_stdev, size=current.size)
-        shot_noise_i = self.rng.normal(0, shot_noise_stdev, size=current.size)
 
-        current += shot_noise_r
-        current += 1j * shot_noise_i
+        # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
+        shot_noise_var = 2 * elementary_charge * self.responsivity * self.lo_power * B_N
 
         # Thermal noise has σ2 = 4*k_B*T*B_N/R_L. FIXME what should R_L be?
-        thermal_noise_stdev = np.sqrt(4 * Boltzmann * 293 * B_N)
-        thermal_noise_r = self.rng.normal(0, thermal_noise_stdev, size=current.size)
-        thermal_noise_i = self.rng.normal(0, thermal_noise_stdev, size=current.size)
+        thermal_noise_var = 4 * Boltzmann * 293 * B_N
 
-        current += thermal_noise_r
-        current += 1j * thermal_noise_i
+        # Shot noise and thermal noise are independent, so their variances add.
+        noise_stdev = np.sqrt(shot_noise_var + thermal_noise_var)
+
+        current += self.rng.normal(0, noise_stdev, size=current.size)
+        current += self.rng.normal(0, noise_stdev, size=current.size) * 1j
 
         return current
