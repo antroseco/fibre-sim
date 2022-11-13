@@ -23,7 +23,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from receiver import OpticalFrontEnd
+from receiver import NoisyOpticalFrontEnd, OpticalFrontEnd
 from system import build_system
 from utils import (
     Component,
@@ -100,7 +100,34 @@ def make_awgn_simulation(
     return simulate_impl(system, length)
 
 
-def run_simulation(
+def nonlinear_link(rx_power_dbm: float) -> Sequence[Component]:
+    # No non-linearities yet...
+    return (
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
+        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS, rx_power_dbm),
+        Decimate(CHANNEL_SPS // RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+    )
+
+
+def make_nonlinear_simulation(
+    modulator: Type[Modulator],
+    demodulator: Type[Demodulator],
+    length: int,
+    rx_power_dbm: float,
+) -> float:
+    system = (
+        modulator(),
+        *nonlinear_link(rx_power_dbm),
+        demodulator(),
+    )
+    return simulate_impl(system, length)
+
+
+def run_awgn_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     ber_function: Callable[[NDArray[np.float64]], NDArray[np.float64]],
     simulation: Callable[[int, float], float],
@@ -127,6 +154,25 @@ def run_simulation(
         else map(simulation, lengths, eb_n0s)
     )
     return eb_n0_dbs[: len(bers)], bers
+
+
+def run_nonlinear_simulation(
+    p_executor: Optional[ProcessPoolExecutor],
+    simulation: Callable[[int, float], float],
+) -> tuple[NDArray[np.int64], list[float]]:
+    LENGTH = 2**17  # 131,072
+
+    rx_power_dbms = np.linspace(-50, -20, 10, endpoint=True)
+    lengths = cycle((LENGTH,))
+
+    # TODO would be nice if this returned the iterator and the plot updated as
+    # the results came in.
+    bers = list(
+        p_executor.map(simulation, lengths, rx_power_dbms)
+        if p_executor
+        else map(simulation, lengths, rx_power_dbms)
+    )
+    return rx_power_dbms, bers
 
 
 def plot_cd_compensation_fir() -> None:
@@ -224,10 +270,10 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
             ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
             ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
         ):
-            fn = partial(run_simulation, p_executor)
+            fn = partial(run_awgn_simulation, p_executor)
             sim_results = t_executor.map(fn, ber_estimators, simulations)
     else:
-        fn = partial(run_simulation, None)
+        fn = partial(run_awgn_simulation, None)
         sim_results = map(fn, ber_estimators, simulations)
 
     for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
@@ -251,5 +297,39 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     plt.show()
 
 
+def plot_nonlinear_simulations(concurrent: bool = True) -> None:
+    _, ax = plt.subplots()
+
+    markers = cycle(("o", "x", "s", "*"))
+    labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
+    simulations = (
+        partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
+        partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
+        partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
+    )
+
+    if concurrent:
+        with (
+            ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
+            ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
+        ):
+            fn = partial(run_nonlinear_simulation, p_executor)
+            sim_results = t_executor.map(fn, simulations)
+    else:
+        fn = partial(run_nonlinear_simulation, None)
+        sim_results = map(fn, simulations)
+
+    for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
+        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+
+    ax.set_ylim(TARGET_BER / 4)
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("RX power (dBm)")
+    ax.legend()
+
+    plt.show()
+
+
 if __name__ == "__main__":
-    plot_awgn_simulations()
+    plot_nonlinear_simulations()
