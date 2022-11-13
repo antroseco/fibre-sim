@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
-from utils import Component, power_dbm_to_lin, signal_power
+from utils import Component, power_dbm_to_lin
 
 
 class OpticalFrontEnd(Component):
@@ -39,21 +39,15 @@ class OpticalFrontEnd(Component):
 
 
 class NoisyOpticalFrontEnd(OpticalFrontEnd):
-    def __init__(self, sampling_rate: float, rx_power_dbm: float) -> None:
+    def __init__(self, sampling_rate: float) -> None:
         super().__init__()
 
         assert sampling_rate > 0
         self.sampling_rate = sampling_rate
 
-        self.rx_power = power_dbm_to_lin(rx_power_dbm)
         self.rng = np.random.default_rng()
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        # Set received signal power to that specified.
-        # TODO remove this once we have proper amplitudes upstream.
-        Efields *= np.sqrt(self.rx_power / signal_power(Efields))
-        assert np.isclose(signal_power(Efields), self.rx_power)
-
         # Noise-less current.
         current = super().__call__(Efields)
 

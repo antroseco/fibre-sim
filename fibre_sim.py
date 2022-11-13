@@ -100,13 +100,13 @@ def make_awgn_simulation(
     return simulate_impl(system, length)
 
 
-def nonlinear_link(rx_power_dbm: float) -> Sequence[Component]:
+def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     # No non-linearities yet...
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
+        IQModulator(ContinuousWaveLaser(tx_power_dbm)),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
-        NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS, rx_power_dbm),
+        NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
         PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
@@ -117,11 +117,11 @@ def make_nonlinear_simulation(
     modulator: Type[Modulator],
     demodulator: Type[Demodulator],
     length: int,
-    rx_power_dbm: float,
+    tx_power_dbm: float,
 ) -> float:
     system = (
         modulator(),
-        *nonlinear_link(rx_power_dbm),
+        *nonlinear_link(tx_power_dbm),
         demodulator(),
     )
     return simulate_impl(system, length)
@@ -162,17 +162,17 @@ def run_nonlinear_simulation(
 ) -> tuple[NDArray[np.int64], list[float]]:
     LENGTH = 2**17  # 131,072
 
-    rx_power_dbms = np.linspace(-50, -20, 10, endpoint=True)
+    tx_power_dbms = np.linspace(-40, 0, 10, endpoint=True)
     lengths = cycle((LENGTH,))
 
     # TODO would be nice if this returned the iterator and the plot updated as
     # the results came in.
     bers = list(
-        p_executor.map(simulation, lengths, rx_power_dbms)
+        p_executor.map(simulation, lengths, tx_power_dbms)
         if p_executor
-        else map(simulation, lengths, rx_power_dbms)
+        else map(simulation, lengths, tx_power_dbms)
     )
-    return rx_power_dbms, bers
+    return tx_power_dbms, bers
 
 
 def plot_cd_compensation_fir() -> None:
@@ -325,7 +325,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
-    ax.set_xlabel("RX power (dBm)")
+    ax.set_xlabel("TX power (dBm)")
     ax.legend()
 
     plt.show()
