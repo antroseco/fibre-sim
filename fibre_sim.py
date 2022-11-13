@@ -86,9 +86,6 @@ def awgn_link(es_n0: float) -> Sequence[Component]:
     )
 
 
-    )
-
-
 def make_awgn_simulation(
     modulator: Type[Modulator],
     demodulator: Type[Demodulator],
