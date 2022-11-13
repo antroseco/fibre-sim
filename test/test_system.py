@@ -174,7 +174,7 @@ class TestIntegration:
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     @pytest.mark.parametrize("channel_sps", [4, 8, 16, 32])
     def test_16qam_with_pulse_shaping(self, eb_n0: float, channel_sps: int):
-        LENGTH = 2**17
+        LENGTH = 2**18
         receiver_sps = channel_sps // 2
 
         config = (
