@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 from itertools import cycle
 from multiprocessing import cpu_count
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Type
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -13,10 +13,12 @@ from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
 from laser import ContinuousWaveLaser
 from modulation import (
+    Demodulator,
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
     IQModulator,
+    Modulator,
     Modulator16QAM,
     ModulatorBPSK,
     ModulatorQPSK,
@@ -71,7 +73,7 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
     return build_system(PseudoRandomStream(), system)(length) / length
 
 
-def default_link(es_n0: float) -> Sequence[Component]:
+def awgn_link(es_n0: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
@@ -84,32 +86,19 @@ def default_link(es_n0: float) -> Sequence[Component]:
     )
 
 
-def simulate_bpsk(length: int, eb_n0: float) -> float:
-    # BPSK over AWGN channel.
-    system = (
-        ModulatorBPSK(),
-        *default_link(eb_n0 * ModulatorBPSK.bits_per_symbol),
-        DemodulatorBPSK(),
     )
-    return simulate_impl(system, length)
 
 
-def simulate_qpsk(length: int, eb_n0: float) -> float:
-    # QPSK over AWGN channel.
+def make_awgn_simulation(
+    modulator: Type[Modulator],
+    demodulator: Type[Demodulator],
+    length: int,
+    eb_n0: float,
+) -> float:
     system = (
-        ModulatorQPSK(),
-        *default_link(eb_n0 * ModulatorQPSK.bits_per_symbol),
-        DemodulatorQPSK(),
-    )
-    return simulate_impl(system, length)
-
-
-def simulate_16qam(length: int, eb_n0: float) -> float:
-    # 16-QAM over AWGN channel.
-    system = (
-        Modulator16QAM(),
-        *default_link(eb_n0 * Modulator16QAM.bits_per_symbol),
-        Demodulator16QAM(),
+        modulator(),
+        *awgn_link(eb_n0 * modulator.bits_per_symbol),
+        demodulator(),
     )
     return simulate_impl(system, length)
 
@@ -217,12 +206,16 @@ def plot_cd_compensation_ber() -> None:
     plt.show()
 
 
-def main(concurrent: bool = True) -> None:
+def plot_awgn_simulations(concurrent: bool = True) -> None:
     _, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
-    simulations = (simulate_bpsk, simulate_qpsk, simulate_16qam)
+    simulations = (
+        partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
+        partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
+        partial(make_awgn_simulation, Modulator16QAM, Demodulator16QAM),
+    )
     ber_estimators = (
         calculate_awgn_ber_with_bpsk,
         calculate_awgn_ber_with_bpsk,
@@ -262,4 +255,4 @@ def main(concurrent: bool = True) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    plot_awgn_simulations()
