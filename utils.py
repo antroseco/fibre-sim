@@ -14,6 +14,10 @@ class Component(ABC):
     # Carrier wavelength = 1550 nm.
     WAVELENGTH = 1550e-9
 
+    # D = 17 ps/nm/km at λ = 1550 nm according to Digital Coherent Optical
+    # Systems.
+    GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)
+
     @abstractmethod
     def __call__(self, data: NDArray) -> NDArray:
         pass

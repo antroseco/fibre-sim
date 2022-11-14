@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 
-from channel import AWGN
+from channel import AWGN, GNChannel
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
 from laser import ContinuousWaveLaser
@@ -101,10 +101,10 @@ def make_awgn_simulation(
 
 
 def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
-    # No non-linearities yet...
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(ContinuousWaveLaser(tx_power_dbm)),
+        GNChannel(FIBRE_LENGTH, SYMBOL_RATE, CHANNEL_SPS),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
@@ -160,9 +160,9 @@ def run_nonlinear_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
-    LENGTH = 2**17  # 131,072
+    LENGTH = 2**18  # 131,072
 
-    tx_power_dbms = np.linspace(-40, 0, 10, endpoint=True)
+    tx_power_dbms = np.linspace(-5, 30, 20, endpoint=True)
     lengths = cycle((LENGTH,))
 
     # TODO would be nice if this returned the iterator and the plot updated as
