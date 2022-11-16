@@ -48,6 +48,9 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         self.rng = np.random.default_rng()
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        # 50 Ω load resistor (common value).
+        R_LOAD = 50
+
         # Noise-less current.
         current = super().__call__(Efields)
 
@@ -57,8 +60,8 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
         shot_noise_var = 2 * elementary_charge * self.responsivity * self.lo_power * B_N
 
-        # Thermal noise has σ2 = 4*k_B*T*B_N/R_L. FIXME what should R_L be?
-        thermal_noise_var = 4 * Boltzmann * 293 * B_N
+        # Thermal noise has σ2 = 4*k_B*T*B_N/R_L.
+        thermal_noise_var = 4 * Boltzmann * 293 * B_N / R_LOAD
 
         # Shot noise and thermal noise are independent, so their variances add.
         noise_stdev = np.sqrt(shot_noise_var + thermal_noise_var)
@@ -66,4 +69,5 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         current += self.rng.normal(0, noise_stdev, size=current.size)
         current += self.rng.normal(0, noise_stdev, size=current.size) * 1j
 
-        return current
+        # Convert current to voltage.
+        return current * R_LOAD
