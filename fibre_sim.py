@@ -398,5 +398,36 @@ def plot_rrc() -> None:
     plt.show()
 
 
+def plot_cd_demo() -> None:
+    SPS = 512
+    data = np.asarray([0, 2, 1, 2, 0])
+
+    pf = PulseFilter(SPS, up=SPS)
+
+    x = pf(data)
+    CD = ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * SPS)
+    y = CD(x)
+
+    fig, axs = plt.subplots(nrows=2)
+
+    axs[0].plot(np.abs(x))
+    axs[0].set_xlabel("Time")
+    axs[0].set_ylabel("Magnitude")
+    axs[0].set_xticks([])
+    axs[0].set_yticks([])
+    axs[0].set_title("Transmitted pulses")
+
+    axs[1].plot(np.abs(y))
+    axs[1].set_xlabel("Time")
+    axs[1].set_ylabel("Magnitude")
+    axs[1].set_xticks([])
+    axs[1].set_yticks([])
+    axs[1].set_title("After Chromatic Dispersion")
+
+    fig.tight_layout()
+
+    plt.show()
+
+
 if __name__ == "__main__":
     plot_nonlinear_simulations()
