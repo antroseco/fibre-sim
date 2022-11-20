@@ -18,8 +18,8 @@ class PulseFilter(Component):
     # A span of 32 is quite long for high values of beta (approaching 1),
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
-    SPAN = 32
-    BETA = 0.24
+    SPAN: int = 32
+    BETA: float = 0.24
 
     def __init__(
         self,
