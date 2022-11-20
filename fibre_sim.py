@@ -6,6 +6,7 @@ from typing import Callable, Optional, Sequence, Type
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
 from channel import AWGN
@@ -424,6 +425,77 @@ def plot_cd_demo() -> None:
     axs[1].set_yticks([])
     axs[1].set_title("After Chromatic Dispersion")
 
+    fig.tight_layout()
+
+    plt.show()
+
+
+def plot_cd_ber_comparison() -> None:
+    LENGTH = 2**18
+    MAX_EB_N0_DB = 10
+
+    def uncompensated_link(fibre_length: int, es_n0: float) -> list[Component]:
+        return [
+            Modulator16QAM(),
+            PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+            ChromaticDispersion(fibre_length, SYMBOL_RATE * CHANNEL_SPS),
+            Decimate(CHANNEL_SPS // RECEIVER_SPS),
+            AWGN(es_n0, RECEIVER_SPS),
+            PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+            Demodulator16QAM(),
+        ]
+
+    def compensated_link(fibre_length: int, es_n0: float) -> list[Component]:
+        link = uncompensated_link(fibre_length, es_n0)
+        link.insert(
+            -2,  # After AWGN, before PulseFilter.
+            CDCompensator(
+                fibre_length, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
+            ),
+        )
+        return link
+
+    def plot_one(ax: Axes, fibre_length_km: int) -> None:
+        markers = cycle(("o", "x", "s", "*"))
+        labels = ("Uncompensated", f"Compensated ({CDC_TAPS} taps)")
+
+        eb_n0_dbs = np.arange(1, MAX_EB_N0_DB + 1)
+        eb_n0s = energy_db_to_lin(eb_n0_dbs)
+
+        for label, marker, link in zip(
+            labels, markers, (uncompensated_link, compensated_link)
+        ):
+            bers = []
+
+            for eb_n0 in eb_n0s:
+                system = build_system(
+                    PseudoRandomStream(),
+                    link(
+                        fibre_length_km * 1000, eb_n0 * Modulator16QAM.bits_per_symbol
+                    ),
+                )
+
+                bers.append(system(LENGTH) / LENGTH)
+
+            ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+
+        th_ber_16qam = calculate_awgn_ber_with_16qam(eb_n0s)
+        ax.plot(eb_n0_dbs, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical")
+
+        ax.set_xlabel("$E_b/N_0$ (dB)")
+        ax.legend()
+        ax.set_title(f"{fibre_length_km} km")
+
+    fig, axs = plt.subplots(ncols=2, sharey=True, figsize=(6.4 * 2, 4.8))
+
+    plot_one(axs[0], 1)
+    plot_one(axs[1], 25)
+
+    # Shared y-axis.
+    axs[0].set_yscale("log")
+    axs[0].set_ylabel("BER")
+
+    fig.suptitle(f"16-QAM at {SYMBOL_RATE//10**9} GBd")
     fig.tight_layout()
 
     plt.show()
