@@ -65,20 +65,56 @@ def plot_signal(component: str, signal: NDArray) -> None:
     plt.show()
 
 
+@overload
+def calculate_awgn_ber_with_bpsk(eb_n0: float) -> float:
+    ...
+
+
+@overload
 def calculate_awgn_ber_with_bpsk(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
+    ...
+
+
+def calculate_awgn_ber_with_bpsk(
+    eb_n0: float | NDArray[np.float64],
+) -> float | NDArray[np.float64]:
     return 0.5 * erfc(np.sqrt(eb_n0))
 
 
+@overload
+def calculate_awgn_ser_with_qam(M: int, eb_n0: float) -> float:
+    ...
+
+
+@overload
 def calculate_awgn_ser_with_qam(
     M: int, eb_n0: NDArray[np.float64]
 ) -> NDArray[np.float64]:
+    ...
+
+
+def calculate_awgn_ser_with_qam(
+    M: int, eb_n0: float | NDArray[np.float64]
+) -> float | NDArray[np.float64]:
     es_n0 = 4 * eb_n0
 
     # Equation 2.16 in Digital Coherent Optical Systems.
     return 2 * (1 - 1 / np.sqrt(M)) * erfc(np.sqrt(3 * es_n0 / (2 * (M - 1))))
 
 
-def calculate_awgn_ber_with_16qam(eb_n0: NDArray[np.float64]) -> NDArray[np.float64]:
+@overload
+def calculate_awgn_ber_with_16qam(eb_n0: float) -> float:
+    ...
+
+
+@overload
+def calculate_awgn_ber_with_16qam(eb_n0: NDArray) -> NDArray[np.float64]:
+    ...
+
+
+def calculate_awgn_ber_with_16qam(
+    eb_n0: float | NDArray[np.float64],
+) -> float | NDArray[np.float64]:
     # This is the SER. Divide by 4 (bits per symbol) to get the approximate BER.
     return calculate_awgn_ser_with_qam(16, eb_n0) / 4
 
