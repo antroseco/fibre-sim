@@ -331,5 +331,72 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     plt.show()
 
 
+def plot_rrc() -> None:
+    SPS = 2
+    EB_N0_dB = 10
+    EB_N0 = energy_db_to_lin(EB_N0_dB)
+    SPANS = list(range(2, 17, 2))
+    BETA = 0.24
+    LENGTH = 2**21
+
+    fig, axs = plt.subplots(nrows=2)
+
+    # AWGN limit and simulated BER over a range of spans.
+    th_ber_16qam = calculate_awgn_ber_with_16qam(EB_N0)
+    axs[0].axhline(
+        th_ber_16qam, color="red", alpha=0.2, linewidth=5, label="AWGN limit"
+    )
+
+    bers = []
+    for span in SPANS:
+        # Need a new instance every time, as the impulse response is cached.
+        pf_up = PulseFilter(SPS, up=SPS)
+        pf_up.SPAN = span
+        pf_up.BETA = BETA
+        pf_down = PulseFilter(SPS, down=SPS)
+        pf_down.SPAN = span
+        pf_down.BETA = BETA
+
+        system = build_system(
+            PseudoRandomStream(),
+            (
+                Modulator16QAM(),
+                pf_up,
+                AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, SPS),
+                pf_down,
+                Demodulator16QAM(),
+            ),
+        )
+
+        bers.append(system(LENGTH) / LENGTH)
+
+    axs[0].plot(SPANS, bers, alpha=0.6, label="Simulated", marker="o")
+
+    axs[0].set_yscale("log")
+    axs[0].set_ylabel("BER")
+    axs[0].set_xlabel("RRC Span (in symbols)")
+    axs[0].legend()
+
+    # Plot the frequency spectrum at the given β.
+    pf = PulseFilter(SPS, up=SPS)
+    pf.SPAN = 128
+    pf.BETA = BETA
+    axs[1].magnitude_spectrum(
+        pf.impulse_response.tolist(),
+        SYMBOL_RATE * SPS / 1e9,
+        sides="twosided",
+    )
+
+    axs[1].set_xlabel("Frequency (GHz)")
+
+    fig.suptitle(
+        f"$E_b/N_0 = {EB_N0_dB}$ dB, $\\beta = {BETA}$, "
+        f"16-QAM at {SYMBOL_RATE//10**9} GBd"
+    )
+    fig.tight_layout()
+
+    plt.show()
+
+
 if __name__ == "__main__":
     plot_nonlinear_simulations()
