@@ -4,6 +4,7 @@ from typing import overload
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
+from scipy.constants import speed_of_light
 from scipy.special import erfc
 
 
@@ -13,6 +14,21 @@ class Component(ABC):
 
     # Carrier wavelength = 1550 nm.
     WAVELENGTH = 1550e-9
+
+    # α = 0.2 dB/km at λ = 1550 nm according to Digital Coherent Optical
+    # Systems.
+    ATTENUATION = 0.2 / (1e4 * np.log10(np.e))  # Np/m
+
+    # D = 17 ps/nm/km at λ = 1550 nm according to Digital Coherent Optical
+    # Systems.
+    GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)  # s/m^2
+
+    BETA_2 = -GROUP_VELOCITY_DISPERSION * WAVELENGTH**2 / (2 * np.pi * speed_of_light)
+
+    # γ = 1.3 /W*km (roughly) according to Digital Coherent Optical Systems.
+    # This includes information about the effective area and the nonlinear index
+    # of the fibre, as well as the wavelength.
+    NONLINEAR_PARAMETER = 1.3e-3  # /W*m
 
     @abstractmethod
     def __call__(self, data: NDArray) -> NDArray:

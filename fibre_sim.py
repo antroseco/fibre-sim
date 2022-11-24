@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
-from channel import AWGN
+from channel import AWGN, SSFChannel
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
 from laser import ContinuousWaveLaser
@@ -106,7 +106,7 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(ContinuousWaveLaser(tx_power_dbm)),
-        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
@@ -161,9 +161,10 @@ def run_nonlinear_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
-    LENGTH = 2**17  # 131,072
+    LENGTH = 2**16  # 65,536
 
-    tx_power_dbms = np.linspace(-40, 0, 10, endpoint=True)
+    tx_power_dbms = np.asarray([-30, -25, -20, -18, -15, 15, 18, 20, 25, 30])
+    # tx_power_dbms = np.linspace(-30, 30, 8, endpoint=True)
     lengths = cycle((LENGTH,))
 
     # TODO would be nice if this returned the iterator and the plot updated as
@@ -302,10 +303,11 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     _, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
-    labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
+    # labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
+    labels = ("Simulated 16-QAM",)
     simulations = (
-        partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
-        partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
+        # partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
+        # partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
         partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
     )
 
@@ -326,7 +328,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
-    ax.set_xlabel("TX power (dBm)")
+    ax.set_xlabel("Power at modulator input (dBm)")
     ax.legend()
 
     plt.show()
