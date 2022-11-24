@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from channel import AWGN, SSFChannel
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
-from laser import ContinuousWaveLaser
+from laser import NoisyLaser
 from modulation import (
     Demodulator,
     Demodulator16QAM,
@@ -77,7 +77,9 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 def awgn_link(es_n0: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(ContinuousWaveLaser(10)),  # Maximum for a Class 1 laser.
+        IQModulator(
+            NoisyLaser(10, SYMBOL_RATE * CHANNEL_SPS)
+        ),  # Maximum power for a Class 1 laser.
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         OpticalFrontEnd(),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
@@ -105,7 +107,7 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     # No non-linearities yet...
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(ContinuousWaveLaser(tx_power_dbm)),
+        IQModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
         SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
