@@ -4,7 +4,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from laser import Laser
-from utils import Component
+from utils import Component, signal_power
+
+from matplotlib import pyplot as plt
 
 
 class Modulator(Component):
@@ -28,7 +30,6 @@ class Demodulator(Component):
 
     @abstractmethod
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool8]:
-        assert symbols.ndim == 1
         assert symbols.dtype == np.cdouble
 
 
@@ -97,7 +98,6 @@ class Modulator16QAM(Modulator):
     @staticmethod
     def impl(msbs: NDArray[np.bool8], lsbs: NDArray[np.bool8]) -> NDArray[np.float64]:
         assert msbs.size == lsbs.size
-        assert msbs.ndim == lsbs.ndim == 1
 
         # Looking at the two LSBs of the constellation symbols, we can see that
         # they completly determine the in-phase component. Looking at the two
@@ -157,8 +157,6 @@ class Demodulator16QAM(Demodulator):
     def impl(
         symbols: NDArray[np.float64], scale: float
     ) -> tuple[NDArray[np.bool8], NDArray[np.bool8]]:
-        assert symbols.ndim == 1
-
         # FIXME explanation. Replace magic numbers.
         msbs = symbols > 0
         lsbs = np.abs(symbols) <= (2 * scale / np.sqrt(10))
@@ -173,6 +171,7 @@ class Demodulator16QAM(Demodulator):
         # we rely on a threshold to distinguish between the inner and outer
         # constellation squares, we need to scale it based on the mean energy
         # of the received symbols.
+        # FIXME replace with a function from utils.
         scale = np.sqrt(np.mean(np.abs(symbols) ** 2))
 
         # Each symbols carries 4 bits. The in-phase component contains the 2
@@ -182,6 +181,66 @@ class Demodulator16QAM(Demodulator):
         data[2::4], data[3::4] = self.impl(np.real(symbols), scale)
 
         return data
+
+
+class DemodulatorPR16QAM(Demodulator16QAM):
+    def filt(self, symbols, N: int) -> NDArray[np.float64]:
+        Es = signal_power(symbols)
+
+        Ts = 1e-11  # TODO
+        phase_noise_var = 2 * np.pi * 100e3 * Ts
+        additive_noise_var = Es / (2 * 40)  # FIXME
+
+        K = np.zeros((N, N))
+        for i in range(N):
+            for j in range(N):
+                K[i, j] = min(i, j)
+
+        I = np.eye(N)
+        C = Es**2 * phase_noise_var * K + Es * additive_noise_var * I
+
+        w_ml = (np.ones(N).T @ np.linalg.inv(C)).T
+        w_ml /= np.max(w_ml)
+        return w_ml
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool8]:
+        theta = np.zeros(symbols.size)
+        decisions = np.empty(symbols.size * self.bits_per_symbol, dtype=np.bool8)
+
+        N = 128  # Number of past symbols used.
+        b = np.ones(N, np.cdouble)  # Buffer.
+
+        ML_filter = self.filt(symbols, N)
+
+        scale = np.sqrt(np.mean(np.abs(symbols) ** 2))
+
+        def demod(symbol: np.cdouble):
+            data = np.empty(self.bits_per_symbol, dtype=np.bool8)
+            data[0], data[1] = self.impl(-np.imag(symbol), scale)
+            data[2], data[3] = self.impl(np.real(symbol), scale)
+            return data
+
+        for i in range(symbols.size):
+            theta[i] = np.angle(ML_filter.T @ b)
+
+            v = symbols[i] * np.exp(-1j * theta[i])
+
+            # FIXME ughh...
+            decisions[4 * i : 4 * i + 4] = demod(v)
+            decision = Modulator16QAM()(decisions[4 * i : 4 * i + 4])
+            b = np.roll(b, 1)
+            b[0:1] = (
+                # FIXME clean this up too.
+                symbols[i]
+                * np.conj(decision)
+                / np.abs(symbols[i] * np.conj(decision))
+            )
+
+        # plt.plot(theta, label="estimated")
+        # plt.legend()
+        # plt.show()
+
+        return decisions
 
 
 class IQModulator(Component):

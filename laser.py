@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from matplotlib import pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
@@ -46,5 +47,8 @@ class NoisyLaser(ContinuousWaveLaser):
 
         # Modelled as a Wiener process.
         noise = np.cumsum(noise_steps)
+
+        # plt.plot(noise, label="phase noise")
+        # plt.show()
 
         return amplitudes * np.exp(1j * noise)

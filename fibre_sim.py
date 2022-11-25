@@ -18,12 +18,14 @@ from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
+    DemodulatorPR16QAM,
     IQModulator,
     Modulator,
     Modulator16QAM,
     ModulatorBPSK,
     ModulatorQPSK,
 )
+from phase_recovery import BlindPhaseSearch
 from receiver import NoisyOpticalFrontEnd, OpticalFrontEnd
 from system import build_system
 from utils import (
@@ -259,13 +261,13 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
     simulations = (
-        partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
-        partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_awgn_simulation, Modulator16QAM, Demodulator16QAM),
+        # partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
+        # partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
+        partial(make_awgn_simulation, Modulator16QAM, DemodulatorPR16QAM),
     )
     ber_estimators = (
-        calculate_awgn_ber_with_bpsk,
-        calculate_awgn_ber_with_bpsk,
+        # calculate_awgn_ber_with_bpsk,
+        # calculate_awgn_ber_with_bpsk,
         calculate_awgn_ber_with_16qam,
     )
 
@@ -310,7 +312,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     simulations = (
         # partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
         # partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
+        partial(make_nonlinear_simulation, Modulator16QAM, DemodulatorPR16QAM),
     )
 
     if concurrent:
@@ -506,4 +508,5 @@ def plot_cd_ber_comparison() -> None:
 
 
 if __name__ == "__main__":
+    # plot_awgn_simulations(False)
     plot_nonlinear_simulations()
