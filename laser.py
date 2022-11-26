@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,6 +37,9 @@ class NoisyLaser(ContinuousWaveLaser):
 
         self.rng = np.random.default_rng()
 
+        # Aids testing and debugging.
+        self.last_noise: Optional[NDArray[np.float64]] = None
+
     def __call__(self, size: int) -> NDArray[np.cdouble]:
         amplitudes = super().__call__(size)
 
@@ -45,6 +49,6 @@ class NoisyLaser(ContinuousWaveLaser):
         noise_steps = self.rng.normal(loc=0, scale=np.sqrt(noise_step_var), size=size)
 
         # Modelled as a Wiener process.
-        noise = np.cumsum(noise_steps)
+        self.last_noise = np.cumsum(noise_steps)
 
-        return amplitudes * np.exp(1j * noise)
+        return amplitudes * np.exp(1j * self.last_noise)
