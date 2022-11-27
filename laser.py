@@ -47,6 +47,7 @@ class NoisyLaser(ContinuousWaveLaser):
 
         # Note that scale is the standard deviation.
         noise_steps = self.rng.normal(loc=0, scale=np.sqrt(noise_step_var), size=size)
+        # TODO initial phase should be uniformly distributed.
 
         # Modelled as a Wiener process.
         self.last_noise = np.cumsum(noise_steps)
