@@ -18,13 +18,13 @@ from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
-    DemodulatorPR16QAM,
     IQModulator,
     Modulator,
     Modulator16QAM,
     ModulatorBPSK,
     ModulatorQPSK,
 )
+from phase_recovery import DecisionDirected
 from receiver import NoisyOpticalFrontEnd, OpticalFrontEnd
 from system import build_system
 from utils import (
@@ -46,7 +46,9 @@ CDC_TAPS = 63
 FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
+DDPR_BUFFER_SIZE = 64
 LASER_LINEWIDTH_ESTIMATE = 100e3  # 100 kHz
+SNR_ESTIMATE = 10  # 10 dB
 
 # Each simulation operates on its own data and the workload is very SIMD/math
 # heavy. As the execution unit is the bottleneck, there is no benefit to
@@ -97,16 +99,23 @@ def make_awgn_simulation(
     length: int,
     eb_n0: float,
 ) -> float:
+    es_n0 = eb_n0 * modulator.bits_per_symbol
     system = (
         modulator(),
-        *awgn_link(eb_n0 * modulator.bits_per_symbol),
-        demodulator(),
+        *awgn_link(es_n0),
+        DecisionDirected(
+            modulator(),
+            demodulator(),
+            DDPR_BUFFER_SIZE,
+            SYMBOL_RATE,
+            LASER_LINEWIDTH_ESTIMATE,
+            es_n0,
+        ),
     )
     return simulate_impl(system, length)
 
 
 def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
-    # No non-linearities yet...
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
@@ -127,7 +136,14 @@ def make_nonlinear_simulation(
     system = (
         modulator(),
         *nonlinear_link(tx_power_dbm),
-        demodulator(),
+        DecisionDirected(
+            modulator(),
+            demodulator(),
+            DDPR_BUFFER_SIZE,
+            SYMBOL_RATE,
+            LASER_LINEWIDTH_ESTIMATE,
+            SNR_ESTIMATE,
+        ),
     )
     return simulate_impl(system, length)
 
@@ -149,7 +165,7 @@ def run_awgn_simulation(
     # Magic heuristic that estimates how many samples we need to get a decent
     # BER estimate. Rounds the result to the next greatest power of 2, as we
     # will be taking the FFT of the data later.
-    lengths = [min(next_power_of_2(int(700 / i)), MAX_LENGTH) for i in expected_bers]
+    lengths = [min(next_power_of_2(int(1200 / i)), MAX_LENGTH) for i in expected_bers]
 
     # TODO would be nice if this returned the iterator and the plot updated as
     # the results came in.
@@ -261,13 +277,13 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
     simulations = (
-        # partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
-        # partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_awgn_simulation, Modulator16QAM, DemodulatorPR16QAM),
+        partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
+        partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
+        partial(make_awgn_simulation, Modulator16QAM, Demodulator16QAM),
     )
     ber_estimators = (
-        # calculate_awgn_ber_with_bpsk,
-        # calculate_awgn_ber_with_bpsk,
+        calculate_awgn_ber_with_bpsk,
+        calculate_awgn_ber_with_bpsk,
         calculate_awgn_ber_with_16qam,
     )
 
@@ -307,12 +323,9 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     _, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
-    # labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
     labels = ("Simulated 16-QAM",)
     simulations = (
-        # partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
-        # partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_nonlinear_simulation, Modulator16QAM, DemodulatorPR16QAM),
+        partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
     )
 
     if concurrent:
@@ -515,8 +528,11 @@ def plot_dd_phase_recovery_buffer_size() -> None:
     laser = NoisyLaser(10, SYMBOL_RATE)
     buffer_sizes = np.arange(2, 17, 2)
 
+    mod = Modulator16QAM()
+    demod = Demodulator16QAM()
+
     link_common = [
-        Modulator16QAM(),
+        mod,
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(laser),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
@@ -530,8 +546,13 @@ def plot_dd_phase_recovery_buffer_size() -> None:
     bers = []
     for buffer_size in buffer_sizes:
         link = link_common + [
-            DemodulatorPR16QAM(
-                buffer_size, SYMBOL_RATE, LASER_LINEWIDTH_ESTIMATE, EB_N0_dB
+            DecisionDirected(
+                mod,
+                demod,
+                buffer_size,
+                SYMBOL_RATE,
+                LASER_LINEWIDTH_ESTIMATE,
+                EB_N0_dB,
             )
         ]
 
@@ -555,8 +576,8 @@ def plot_dd_phase_recovery_buffer_size() -> None:
     axs[0].legend()
 
     # Plot ML filter on the side.
-    ml_filter = DemodulatorPR16QAM(
-        16, SYMBOL_RATE, LASER_LINEWIDTH_ESTIMATE, EB_N0_dB
+    ml_filter = DecisionDirected(
+        mod, demod, 16, SYMBOL_RATE, LASER_LINEWIDTH_ESTIMATE, EB_N0_dB
     ).ml_filter
     axs[1].stem(ml_filter)
 
