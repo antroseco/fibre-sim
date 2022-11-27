@@ -18,6 +18,7 @@ from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
+    DemodulatorPR16QAM,
     IQModulator,
     Modulator,
     Modulator16QAM,
@@ -45,6 +46,7 @@ CDC_TAPS = 63
 FIBRE_LENGTH = 25_000  # 25 km
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
+LASER_LINEWIDTH_ESTIMATE = 100e3  # 100 kHz
 
 # Each simulation operates on its own data and the workload is very SIMD/math
 # heavy. As the execution unit is the bottleneck, there is no benefit to
@@ -259,13 +261,13 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
     simulations = (
-        partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
-        partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_awgn_simulation, Modulator16QAM, Demodulator16QAM),
+        # partial(make_awgn_simulation, ModulatorBPSK, DemodulatorBPSK),
+        # partial(make_awgn_simulation, ModulatorQPSK, DemodulatorQPSK),
+        partial(make_awgn_simulation, Modulator16QAM, DemodulatorPR16QAM),
     )
     ber_estimators = (
-        calculate_awgn_ber_with_bpsk,
-        calculate_awgn_ber_with_bpsk,
+        # calculate_awgn_ber_with_bpsk,
+        # calculate_awgn_ber_with_bpsk,
         calculate_awgn_ber_with_16qam,
     )
 
@@ -310,7 +312,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     simulations = (
         # partial(make_nonlinear_simulation, ModulatorBPSK, DemodulatorBPSK),
         # partial(make_nonlinear_simulation, ModulatorQPSK, DemodulatorQPSK),
-        partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
+        partial(make_nonlinear_simulation, Modulator16QAM, DemodulatorPR16QAM),
     )
 
     if concurrent:
@@ -501,6 +503,66 @@ def plot_cd_ber_comparison() -> None:
 
     fig.suptitle(f"16-QAM at {SYMBOL_RATE//10**9} GBd")
     fig.tight_layout()
+
+    plt.show()
+
+
+def plot_dd_phase_recovery_buffer_size() -> None:
+    LENGTH = 2**14
+    EB_N0_dB = 10
+    EB_N0 = energy_db_to_lin(EB_N0_dB)
+
+    laser = NoisyLaser(10, SYMBOL_RATE)
+    buffer_sizes = np.arange(2, 17, 2)
+
+    link_common = [
+        Modulator16QAM(),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        IQModulator(laser),
+        ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        OpticalFrontEnd(),
+        Decimate(CHANNEL_SPS // RECEIVER_SPS),
+        AWGN(EB_N0 * Modulator16QAM.bits_per_symbol, RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+    ]
+
+    bers = []
+    for buffer_size in buffer_sizes:
+        link = link_common + [
+            DemodulatorPR16QAM(
+                buffer_size, SYMBOL_RATE, LASER_LINEWIDTH_ESTIMATE, EB_N0_dB
+            )
+        ]
+
+        system = build_system(PseudoRandomStream(), link)
+        bers.append(system(LENGTH) / LENGTH)
+
+    _, axs = plt.subplots(ncols=2)
+
+    axs[0].plot(buffer_sizes, bers, alpha=0.6, label="Simulated", marker="o")
+
+    # Also plot AWGN limit.
+    th_ber_16qam = calculate_awgn_ber_with_16qam(EB_N0)
+    axs[0].axhline(
+        th_ber_16qam, color="red", alpha=0.2, linewidth=5, label="AWGN limit"
+    )
+
+    axs[0].set_yscale("log")
+    axs[0].set_ylabel("BER")
+    axs[0].set_xlabel("Phase recovery buffer size")
+    axs[0].set_title(f"$E_b/N_0 = {EB_N0_dB}$ dB, 16-QAM at {SYMBOL_RATE//10**9} GBd")
+    axs[0].legend()
+
+    # Plot ML filter on the side.
+    ml_filter = DemodulatorPR16QAM(
+        16, SYMBOL_RATE, LASER_LINEWIDTH_ESTIMATE, EB_N0_dB
+    ).ml_filter
+    axs[1].stem(ml_filter)
+
+    axs[1].set_xlabel("Taps")
+    axs[1].set_ylabel("Filter coefficient")
+    axs[1].set_title("ML filter (16 taps)")
 
     plt.show()
 
