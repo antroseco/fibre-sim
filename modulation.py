@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from laser import Laser
-from utils import Component
+from utils import Component, signal_power
 
 
 class Modulator(Component):
@@ -182,9 +182,8 @@ class Demodulator16QAM(Demodulator):
         # we rely on a threshold to distinguish between the inner and outer
         # constellation squares, we need to scale it based on the mean energy
         # of the received symbols.
-        # FIXME replace with a function from utils.
         if scale is None:
-            scale = np.sqrt(np.mean(np.abs(symbols) ** 2))
+            scale = np.sqrt(signal_power(symbols))
 
         # Make the type checker happy.
         assert scale is not None
