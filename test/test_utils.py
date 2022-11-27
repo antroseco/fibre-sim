@@ -11,6 +11,7 @@ from utils import (
     is_power_of_2,
     next_power_of_2,
     normalize_energy,
+    normalize_power,
     overlap_save,
     power_dbm_to_lin,
     signal_energy,
@@ -162,6 +163,21 @@ class TestEnergy:
 
         # Signal energy must be 1.
         assert np.isclose(signal_energy(normalized), 1)
+
+    @staticmethod
+    def test_normalize_power():
+        LENGTH = 128
+
+        signal = np.random.randn(LENGTH) + 1j * np.random.randn(LENGTH)
+        normalized = normalize_power(signal)
+
+        assert normalized.dtype == signal.dtype
+        assert normalized.ndim == signal.ndim
+        assert normalized.size == signal.size
+        assert np.all(np.isfinite(normalized))
+
+        # Signal power must be 1.
+        assert np.isclose(signal_power(normalized), 1)
 
     @staticmethod
     @pytest.mark.parametrize(

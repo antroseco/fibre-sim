@@ -227,6 +227,10 @@ def normalize_energy(signal: NDArray) -> NDArray:
     return signal / np.sqrt(signal_energy(signal))
 
 
+def normalize_power(signal: NDArray) -> NDArray:
+    return signal / np.sqrt(signal_power(signal))
+
+
 @overload
 def energy_db_to_lin(db: float) -> float:
     ...
