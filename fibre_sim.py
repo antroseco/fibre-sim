@@ -588,5 +588,54 @@ def plot_dd_phase_recovery_buffer_size() -> None:
     plt.show()
 
 
+def plot_step_size_comparison() -> None:
+    LENGTH = 2**14
+    TX_POWER_dBm = 20
+
+    hs = [50, 100, 250, 500, 1000, 2000]
+
+    channel = SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS)
+
+    system = build_system(
+        PseudoRandomStream(),
+        (
+            Modulator16QAM(),
+            PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+            IQModulator(NoisyLaser(TX_POWER_dBm, SYMBOL_RATE * CHANNEL_SPS)),
+            channel,
+            NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
+            Decimate(CHANNEL_SPS // RECEIVER_SPS),
+            CDCompensator(
+                FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
+            ),
+            PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+            DecisionDirected(
+                Modulator16QAM(),
+                Demodulator16QAM(),
+                DDPR_BUFFER_SIZE,
+                SYMBOL_RATE,
+                LASER_LINEWIDTH_ESTIMATE,
+                SNR_ESTIMATE,
+            ),
+        ),
+    )
+
+    bers = []
+    for h in hs:
+        channel.h = h
+        bers.append(system(LENGTH) / LENGTH)
+
+    _, ax = plt.subplots()
+
+    ax.plot(hs, bers, alpha=0.6, marker="o")
+
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("Split-step Fourier step size [m]")
+    ax.set_title(f"TX power = {TX_POWER_dBm} dBm, 16-QAM at {SYMBOL_RATE//10**9} GBd")
+
+    plt.show()
+
+
 if __name__ == "__main__":
     plot_nonlinear_simulations()
