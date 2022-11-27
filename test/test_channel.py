@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
-from channel import AWGN
-from utils import signal_power, signal_energy
+
+from channel import AWGN, Splitter
+from utils import signal_energy, signal_power, energy_db_to_lin
 
 
 class TestAWGN:
@@ -62,3 +63,30 @@ class TestAWGN:
         # distribution generating the noise.
         n0 = np.var(noise)
         assert np.isclose(ES / n0, ES_N0, atol=0.1)
+
+
+class TestSplitter:
+    rng = np.random.default_rng()
+    test_data = rng.integers(-2, 2, endpoint=True, size=2**14) + 2j
+
+    @pytest.mark.parametrize("ratio", [-1, 0, 1, 3, 17])
+    def test_illegal_ratios(self, ratio: int) -> None:
+        with pytest.raises(Exception):
+            Splitter(ratio)
+
+    def test_preserves_length(self) -> None:
+        splitter = Splitter(32)
+
+        assert splitter(self.test_data).size == self.test_data.size
+
+    @pytest.mark.parametrize("ratio", [2, 4, 16, 32])
+    def test_power_change(self, ratio: int) -> None:
+        splitter = Splitter(ratio)
+
+        power_in = signal_power(self.test_data)
+        power_out = signal_power(splitter(self.test_data))
+
+        # 3.5 dB loss per coupler (overhead of 0.5 dB).
+        expected = 3.5 * np.log2(ratio)
+
+        assert np.isclose(power_in / power_out, energy_db_to_lin(expected))

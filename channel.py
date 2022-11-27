@@ -4,7 +4,13 @@ from functools import cache
 import numpy as np
 from numpy.typing import NDArray
 
-from utils import Component, samples_squared, signal_power
+from utils import (
+    Component,
+    samples_squared,
+    signal_power,
+    is_power_of_2,
+    energy_db_to_lin,
+)
 
 
 class Channel(Component):
@@ -100,3 +106,21 @@ class SSFChannel(Channel):
             symbols = self.split_step_impl(symbols, remaining_length)
 
         return symbols
+
+
+class Splitter(Channel):
+    def __init__(self, ratio: int) -> None:
+        super().__init__()
+
+        assert ratio > 1 and is_power_of_2(ratio)
+
+        # 3.5 dB loss per coupler (0.5 dB overhead).
+        attenuation_dB = 3.5 * np.log2(ratio)
+        attenuation = energy_db_to_lin(attenuation_dB)
+
+        self.factor = 1 / np.sqrt(attenuation)
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        super().__call__(symbols)
+
+        return symbols * self.factor

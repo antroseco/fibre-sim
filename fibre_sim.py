@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
-from channel import AWGN, SSFChannel
+from channel import AWGN, SSFChannel, Splitter
 from data_stream import PseudoRandomStream
 from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
 from laser import NoisyLaser
@@ -44,6 +44,8 @@ RECEIVER_SPS = 2
 # overlap-save frame size, which should be strictly better.
 CDC_TAPS = 63
 FIBRE_LENGTH = 25_000  # 25 km
+SPLITTING_POINT = 24_000  # 24 km
+CONSUMERS = 64
 SYMBOL_RATE = 50 * 10**9  # 50 GS/s
 TARGET_BER = 0.5 * 10**-3
 DDPR_BUFFER_SIZE = 64
@@ -119,7 +121,9 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
         IQModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
-        SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        SSFChannel(SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
+        Splitter(CONSUMERS),
+        SSFChannel(FIBRE_LENGTH - SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
         NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
         CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
@@ -183,8 +187,7 @@ def run_nonlinear_simulation(
 ) -> tuple[NDArray[np.int64], list[float]]:
     LENGTH = 2**16  # 65,536
 
-    tx_power_dbms = np.asarray([-30, -25, -20, -18, -15, 15, 18, 20, 25, 30])
-    # tx_power_dbms = np.linspace(-30, 30, 8, endpoint=True)
+    tx_power_dbms = np.linspace(-10, 25, 24, endpoint=True)
     lengths = cycle((LENGTH,))
 
     # TODO would be nice if this returned the iterator and the plot updated as
@@ -345,6 +348,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
+    # TODO use the power going into the fibre (after the I/Q Modulator).
     ax.set_xlabel("Power at modulator input (dBm)")
     ax.legend()
 
