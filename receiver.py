@@ -6,6 +6,8 @@ from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
 from utils import Component, power_dbm_to_lin
 
+# TODO noisy laser
+
 
 class OpticalFrontEnd(Component):
     input_type = "cd electric field"

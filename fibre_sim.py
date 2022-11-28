@@ -9,9 +9,15 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
-from channel import AWGN, SSFChannel, Splitter
+from channel import AWGN, Splitter, SSFChannel
 from data_stream import PseudoRandomStream
-from filters import CDCompensator, ChromaticDispersion, Decimate, PulseFilter
+from filters import (
+    AdaptiveEqualizer,
+    CDCompensator,
+    ChromaticDispersion,
+    Decimate,
+    PulseFilter,
+)
 from laser import NoisyLaser
 from modulation import (
     Demodulator,
@@ -117,6 +123,14 @@ def make_awgn_simulation(
     return simulate_impl(system, length)
 
 
+class AEQplot(Component):
+    def __call__(self, data: NDArray) -> NDArray:
+        length = data.size
+        plt.scatter(range(length), np.abs(data[:length]), alpha=0.2)
+        plt.show()
+        return data
+
+
 def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
@@ -126,8 +140,10 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
         SSFChannel(FIBRE_LENGTH - SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
         NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
-        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, 63),
         PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+        AdaptiveEqualizer(128, 1e-3),
+        AEQplot(),
     )
 
 
@@ -185,9 +201,9 @@ def run_nonlinear_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
-    LENGTH = 2**16  # 65,536
+    LENGTH = 2**20  # 65,536
 
-    tx_power_dbms = np.linspace(-10, 25, 24, endpoint=True)
+    tx_power_dbms = np.linspace(-5, 20, 8, endpoint=True)
     lengths = cycle((LENGTH,))
 
     # TODO would be nice if this returned the iterator and the plot updated as
@@ -641,5 +657,74 @@ def plot_step_size_comparison() -> None:
     plt.show()
 
 
+def plot_adaptive_equalizer_comparison() -> None:
+    # FIXME ensure this reconstructs the link every time (AdaptiveEqualizer has
+    # state).
+    def make_simulation(
+        adaptive: bool,
+        cdc_taps: int,
+        length: int,
+        tx_power_dbm: float,
+    ) -> float:
+        link = [
+            Modulator16QAM(),
+            PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+            IQModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
+            SSFChannel(SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
+            Splitter(CONSUMERS),
+            SSFChannel(FIBRE_LENGTH - SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
+            NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
+            Decimate(CHANNEL_SPS // RECEIVER_SPS),
+            CDCompensator(
+                FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, cdc_taps
+            ),
+            PulseFilter(RECEIVER_SPS, down=1 if adaptive else 2),
+            DecisionDirected(
+                Modulator16QAM(),
+                Demodulator16QAM(),
+                DDPR_BUFFER_SIZE,
+                SYMBOL_RATE,
+                LASER_LINEWIDTH_ESTIMATE,
+                SNR_ESTIMATE,
+            ),
+        ]
+
+        if adaptive:
+            link.insert(-1, AdaptiveEqualizer(63, 1e-3))
+
+        return simulate_impl(link, length)
+
+    markers = cycle(("o", "x", "s", "*"))
+    labels = (
+        f"Adaptive: 63 taps, CDC: {CDC_TAPS // 2} taps",
+        f"Adaptive: 63 taps, CDC: {CDC_TAPS} taps",
+        f"Adaptive: off taps, CDC: {CDC_TAPS // 2} taps",
+        f"Adaptive: off taps, CDC: {CDC_TAPS} taps",
+    )
+    simulations = (
+        partial(make_simulation, True, CDC_TAPS // 2),
+        partial(make_simulation, True, CDC_TAPS),
+        partial(make_simulation, False, CDC_TAPS // 2),
+        partial(make_simulation, False, CDC_TAPS),
+    )
+
+    fn = partial(run_nonlinear_simulation, None)
+    sim_results = map(fn, simulations)
+
+    _, ax = plt.subplots()
+
+    for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
+        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+
+    ax.set_ylim(TARGET_BER / 4)
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    # TODO use the power going into the fibre (after the I/Q Modulator).
+    ax.set_xlabel("Power at modulator input (dBm)")
+    ax.legend()
+
+    plt.show()
+
+
 if __name__ == "__main__":
-    plot_nonlinear_simulations()
+    plot_adaptive_equalizer_comparison()
