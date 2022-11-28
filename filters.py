@@ -1,4 +1,5 @@
 from functools import cached_property
+from math import floor, ceil
 from typing import Optional
 
 import numpy as np
@@ -8,7 +9,7 @@ from scipy.linalg import toeplitz
 from scipy.signal import decimate
 from scipy.special import erf
 
-from utils import Component, overlap_save, signal_energy
+from utils import Component, normalize_power, overlap_save, signal_energy
 
 
 class PulseFilter(Component):
@@ -44,7 +45,7 @@ class PulseFilter(Component):
             assert up > 1
             assert down is None
         if down is not None:
-            assert down > 1
+            assert down > 0
             assert up is None
 
         self.up = up
@@ -273,3 +274,59 @@ class Decimate(Component):
         return decimate(symbols, self.factor).astype(
             np.cdouble, casting="no", copy=False
         )
+
+
+class AdaptiveEqualizer(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    cma_to_rde_threshold = 256  # TODO find a good value.
+
+    def __init__(self, taps: int, mu: float) -> None:
+        super().__init__()
+
+        assert taps > 0
+        self.taps = taps
+
+        assert mu > 0
+        self.mu = mu
+
+        # Filter coefficients with single spike initialization.
+        self.w = np.zeros(self.taps, dtype=np.cdouble)
+        self.lag = floor(self.taps / 2) + 1
+        self.w[self.lag - 1] = 1
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        normalized = normalize_power(symbols)
+
+        # TODO train on the first e.g. 1000 symbols and then stop updating the
+        # filter.
+
+        R_cma = 1.32  # TODO explanation.
+        R_rde = np.asarray((1 / np.sqrt(5), 1, 3 / np.sqrt(5)))
+
+        # Wrap input array.
+        data = np.concatenate(
+            (normalized[-self.lag + 1 :], normalized, normalized[: self.lag])
+        )
+        assert data.size == normalized.size + self.w.size
+
+        # Output array. Downsample 2:1. TODO add parameter for this.
+        y = np.empty(ceil(normalized.size / 2), dtype=np.cdouble)
+
+        for i in range(y.size):
+            x = data[2 * i : 2 * i + self.w.size]
+
+            y[i] = self.w.conj() @ x
+
+            if i < self.cma_to_rde_threshold:
+                # CMA update step.
+                self.w += self.mu * x * (R_cma - np.abs(y[i]) ** 2) * np.conj(y[i])
+            else:
+                # Get radius closest to the compensated symbol.
+                r = R_rde[np.argmin(np.abs(R_rde - np.abs(y[i])))]
+
+                # RDE update step.
+                self.w += self.mu * x * (r**2 - np.abs(y[i]) ** 2) * np.conj(y[i])
+
+        return y
