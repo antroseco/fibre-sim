@@ -1,5 +1,5 @@
-from functools import cached_property
-from math import floor, ceil
+from functools import cache, cached_property
+from math import ceil, floor
 from typing import Optional
 
 import numpy as np
@@ -161,19 +161,23 @@ class CDBase(Component):
 
 
 class ChromaticDispersion(CDBase):
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert symbols.ndim == 1
-
+    @cache
+    def cd_spectrum(self, size: int) -> NDArray[np.cdouble]:
         # This is the baseband representation of the signal, which has the same
         # bandwidth as the upconverted PAM signal. It's already centered around
         # 0, so there's no need to subtract the carrier frequency from its
         # spectrum.
-        Df = np.fft.fftfreq(symbols.size, self.sampling_interval)
+        Df = np.fft.fftfreq(size, self.sampling_interval)
 
         arg = self.K * (2 * np.pi * self.sampling_interval) ** 2
-        cd = np.exp(-1j * arg * Df**2)
 
-        # FIXME this is circular convolution.
+        return np.exp(-1j * arg * Df**2)
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert symbols.ndim == 1
+
+        cd = self.cd_spectrum(symbols.size)
+
         return np.fft.ifft(np.fft.fft(symbols) * cd)
 
 
