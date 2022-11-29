@@ -210,7 +210,15 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
 
 
 def samples_squared(signal: NDArray) -> NDArray[np.float64]:
-    return np.real(np.conj(signal) * signal)
+    assert has_up_to_two_polarizations(signal)
+
+    squares = np.real(np.conj(signal) * signal)
+
+    if has_two_polarizations(signal):
+        # Sum both polarizations.
+        return squares.sum(axis=0)
+
+    return squares
 
 
 def signal_energy(signal: NDArray, sampling_interval: float = 1) -> float:
