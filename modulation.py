@@ -239,3 +239,15 @@ class IQModulator(Component):
 
     def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         return self.iq_impl(voltages, self.laser(voltages.size))
+
+
+class DPModulator(IQModulator):
+    def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(voltages)
+
+        laser_output = self.laser(voltages.size)
+
+        pol_v = 0.5 * self.iq_impl(voltages, laser_output)
+        pol_h = 0.5 * self.iq_impl(voltages, laser_output)
+
+        return np.vstack((pol_v, pol_h))
