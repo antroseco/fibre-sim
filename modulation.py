@@ -212,9 +212,10 @@ class IQModulator(Component):
 
         # Input voltage should range from -Vπ to +Vπ. Remove this restriction
         # from the caller by inferring Vπ.
-        Vpi = max(np.max(np.abs(np.real(voltages))), np.max(np.abs(np.imag(voltages))))
+        max_a = lambda x: np.max(np.abs(x))
+        Vpi = max(max_a(np.real(voltages)), max_a(np.imag(voltages)))
 
-        # FIXME increase Vpi to make the cosine function looks more linear. Is
+        # FIXME increase Vpi to make the cosine function look more linear. Is
         # there a better way to do this?
         Vpi *= 1.35
 
