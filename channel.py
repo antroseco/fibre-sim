@@ -78,14 +78,13 @@ class SSFChannel(Channel):
     def split_step_impl(
         self, symbols: NDArray[np.cdouble], step_size: int
     ) -> NDArray[np.cdouble]:
-        # Nonlinear term.
-        nonlinear_param = self.NONLINEAR_PARAMETER
-        if has_two_polarizations(symbols):
-            # Extra factor in the Manakov equation.
-            nonlinear_param *= 8 / 9
+        # Extra factor in the Manakov equation.
+        factor = 8 / 9 if has_two_polarizations(symbols) else 1
 
+        # Nonlinear term.
         nonlinear_term = np.exp(
-            (-1j * step_size * self.NONLINEAR_PARAMETER) * samples_squared(symbols)
+            (-1j * step_size * factor * self.NONLINEAR_PARAMETER)
+            * samples_squared(symbols)
         )
 
         # Linear term.
