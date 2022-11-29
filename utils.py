@@ -271,3 +271,9 @@ def has_two_polarizations(array: NDArray) -> bool:
 
 def has_up_to_two_polarizations(array: NDArray) -> bool:
     return has_one_polarization(array) or has_two_polarizations(array)
+
+
+def row_size(array: NDArray) -> int:
+    assert has_up_to_two_polarizations(array)
+
+    return array.size if has_one_polarization(array) else array.size // 2

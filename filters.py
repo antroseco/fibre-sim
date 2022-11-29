@@ -16,6 +16,7 @@ from utils import (
     normalize_power,
     overlap_save,
     signal_energy,
+    row_size,
 )
 
 
@@ -185,7 +186,7 @@ class ChromaticDispersion(CDBase):
         # axis by default (axis=1, i.e. along each row).
         assert has_up_to_two_polarizations(symbols)
 
-        cd = self.cd_spectrum(symbols.size)
+        cd = self.cd_spectrum(row_size(symbols))
 
         return np.fft.ifft(np.fft.fft(symbols) * cd)
 
