@@ -7,8 +7,10 @@ from utils import (
     Component,
     energy_db_to_lin,
     has_one_polarization,
+    has_two_polarizations,
     has_up_to_two_polarizations,
     is_power_of_2,
+    row_size,
     samples_squared,
     signal_power,
 )
@@ -77,19 +79,26 @@ class SSFChannel(Channel):
         self, symbols: NDArray[np.cdouble], step_size: int
     ) -> NDArray[np.cdouble]:
         # Nonlinear term.
+        nonlinear_param = self.NONLINEAR_PARAMETER
+        if has_two_polarizations(symbols):
+            # Extra factor in the Manakov equation.
+            nonlinear_param *= 8 / 9
+
         nonlinear_term = np.exp(
             (-1j * step_size * self.NONLINEAR_PARAMETER) * samples_squared(symbols)
         )
 
         # Linear term.
-        linear_arg = self.get_linear_arg(symbols.size, self.sampling_interval)
+        linear_arg = self.get_linear_arg(row_size(symbols), self.sampling_interval)
         linear_term = np.exp(linear_arg * (-step_size / 2))
 
         # TODO investigate symmetrized schemes.
         return np.fft.ifft(np.fft.fft(symbols * nonlinear_term) * linear_term)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert has_one_polarization(symbols)
+        # Equations are mostly the same for one and two polarizations. fft and
+        # ifft can handle two rows just fine.
+        assert has_up_to_two_polarizations(symbols)
         # FIXME assert is_power_of_2(symbols.size)
 
         remaining_length = self.length
