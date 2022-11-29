@@ -5,7 +5,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from laser import Laser
-from utils import Component, signal_power
+from utils import (
+    Component,
+    has_one_polarization,
+    has_two_polarizations,
+    signal_power,
+)
 
 
 class Modulator(Component):
@@ -16,7 +21,6 @@ class Modulator(Component):
 
     @abstractmethod
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
-        assert data.ndim == 1
         assert data.dtype == np.bool8
         assert data.size % self.bits_per_symbol == 0
 
@@ -31,7 +35,6 @@ class Demodulator(Component):
     def __call__(
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
     ) -> NDArray[np.bool8]:
-        assert symbols.ndim == 1
         assert symbols.dtype == np.cdouble
 
 
@@ -40,6 +43,7 @@ class ModulatorBPSK(Modulator):
 
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
         super().__call__(data)
+        assert has_one_polarization(data)
 
         # Map bits to symbols (1 -> -1, 0 -> 1).
         return 1 - 2 * data.astype(np.cdouble)
@@ -52,6 +56,7 @@ class DemodulatorBPSK(Demodulator):
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
     ) -> NDArray[np.bool8]:
         super().__call__(symbols)
+        assert has_one_polarization(symbols)
 
         return symbols < 0
 
@@ -61,6 +66,7 @@ class ModulatorQPSK(Modulator):
 
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
         super().__call__(data)
+        assert has_one_polarization(data)
 
         # Constellation has 4 symbols. Adjacent symbols only vary by 1 bit.
         #
@@ -85,6 +91,7 @@ class DemodulatorQPSK(Demodulator):
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
     ) -> NDArray[np.bool8]:
         super().__call__(symbols)
+        assert has_one_polarization(symbols)
 
         # In-phase component is the MSB.
         msb = np.real(symbols) < 0
@@ -104,7 +111,6 @@ class Modulator16QAM(Modulator):
     @staticmethod
     def impl(msbs: NDArray[np.bool8], lsbs: NDArray[np.bool8]) -> NDArray[np.float64]:
         assert msbs.size == lsbs.size
-        assert msbs.ndim == lsbs.ndim == 1
 
         # Looking at the two LSBs of the constellation symbols, we can see that
         # they completly determine the in-phase component. Looking at the two
@@ -127,6 +133,7 @@ class Modulator16QAM(Modulator):
 
     def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
         super().__call__(data)
+        assert has_one_polarization(data)
 
         # Constellation has 16 symbols. Adjacent symbols only vary by 1 bit.
         # 0111 is at (1, 1) and 0010 is at (3, 3).
@@ -164,8 +171,6 @@ class Demodulator16QAM(Demodulator):
     def impl(
         symbols: NDArray[np.float64], scale: float
     ) -> tuple[NDArray[np.bool8], NDArray[np.bool8]]:
-        assert symbols.ndim == 1
-
         # FIXME explanation. Replace magic numbers.
         msbs = symbols > 0
         lsbs = np.abs(symbols) <= (2 * scale / np.sqrt(10))
@@ -176,6 +181,7 @@ class Demodulator16QAM(Demodulator):
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
     ) -> NDArray[np.bool8]:
         super().__call__(symbols)
+        assert has_one_polarization(symbols)
 
         # FIXME this should be replaced with a proper filter. Due to pulse
         # shaping and downsampling, the symbols no longer have unit energy. As
@@ -206,9 +212,13 @@ class IQModulator(Component):
 
         self.laser = laser
 
-    def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert voltages.ndim == 1
-        assert voltages.size > 0
+    @staticmethod
+    def iq_impl(
+        voltages: NDArray[np.cdouble], laser_output: NDArray[np.cdouble]
+    ) -> NDArray[np.cdouble]:
+        assert has_one_polarization(voltages)
+        assert has_one_polarization(laser_output)
+        assert voltages.size == laser_output.size
 
         # Input voltage should range from -Vπ to +Vπ. Remove this restriction
         # from the caller by inferring Vπ.
@@ -222,7 +232,10 @@ class IQModulator(Component):
         # Add the DC bias of -Vπ, and divide by Vπ, which is 1.
         phi = (voltages - Vpi) * (np.pi / Vpi)
 
-        Efield = 0.5 * self.laser(voltages.size)
+        Efield = 0.5 * laser_output
         Efield *= np.cos(np.real(phi) / 2) + 1j * np.sin(np.imag(phi) / 2)
 
         return Efield
+
+    def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        return self.iq_impl(voltages, self.laser(voltages.size))

@@ -247,3 +247,27 @@ def energy_db_to_lin(db: float | NDArray) -> float | NDArray[np.float64]:
 
 def power_dbm_to_lin(dbm: float) -> float:
     return energy_db_to_lin(dbm - 30)
+
+
+def has_one_polarization(array: NDArray) -> bool:
+    # Array shouldn't be empty.
+    if not array.size:
+        return False
+
+    return array.ndim == 1
+
+
+def has_two_polarizations(array: NDArray) -> bool:
+    # Array shouldn't be empty.
+    if not array.size:
+        return False
+
+    if array.ndim != 2:
+        return False
+
+    nrows, _ = array.shape
+    return nrows == 2
+
+
+def has_up_to_two_polarizations(array: NDArray) -> bool:
+    return has_one_polarization(array) or has_two_polarizations(array)

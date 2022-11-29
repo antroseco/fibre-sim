@@ -9,7 +9,14 @@ from scipy.linalg import toeplitz
 from scipy.signal import decimate
 from scipy.special import erf
 
-from utils import Component, normalize_power, overlap_save, signal_energy
+from utils import (
+    Component,
+    has_one_polarization,
+    has_up_to_two_polarizations,
+    normalize_power,
+    overlap_save,
+    signal_energy,
+)
 
 
 class PulseFilter(Component):
@@ -77,7 +84,7 @@ class PulseFilter(Component):
         return symbols[:: self.down]
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert symbols.ndim == 1
+        assert has_one_polarization(symbols)
 
         # To avoid aliasing, filtering should be done after upsamlping but
         # before downsampling.
@@ -174,7 +181,9 @@ class ChromaticDispersion(CDBase):
         return np.exp(-1j * arg * Df**2)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert symbols.ndim == 1
+        # fft and ifft work just fine with 2D arrays. They operate on the last
+        # axis by default (axis=1, i.e. along each row).
+        assert has_up_to_two_polarizations(symbols)
 
         cd = self.cd_spectrum(symbols.size)
 
@@ -247,6 +256,8 @@ class CDCompensator(CDBase):
         return np.linalg.solve(self.Q, self.D)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(data)
+
         return overlap_save(self.h, data, True)[
             self.fir_length // 2 : -self.fir_length // 2 + 1
         ]
@@ -263,6 +274,9 @@ class Decimate(Component):
         self.factor = factor
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        # decimate operates over the last axis by default, i.e. along each row.
+        assert has_up_to_two_polarizations(symbols)
+
         # To prevent aliasing, a low-pass filter needs to be applied before
         # downsampling. In the real implementation, this could be done with an
         # analogue filter followed by sampling at the desired rate. Here, we
@@ -301,6 +315,8 @@ class AdaptiveEqualizer(Component):
         self.w[self.lag - 1] = 1
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+
         normalized = normalize_power(symbols)
 
         # TODO train on the first e.g. 1000 symbols and then stop updating the

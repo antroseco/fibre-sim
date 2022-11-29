@@ -5,7 +5,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from modulation import Demodulator, Modulator
-from utils import Component, energy_db_to_lin, normalize_energy, signal_power
+from utils import (
+    Component,
+    energy_db_to_lin,
+    normalize_energy,
+    signal_power,
+    has_one_polarization,
+)
 
 
 class PhaseRecovery(Component):
@@ -22,6 +28,8 @@ class BlindPhaseSearch(PhaseRecovery):
     P = np.pi / 2  # For all M-QAM modulation schemes.
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+
         b = np.arange(-self.B // 2, self.B // 2)
         assert b.size == self.B
 
@@ -116,6 +124,8 @@ class DecisionDirected(PhaseRecovery):
         return w_ml
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool8]:
+        assert has_one_polarization(symbols)
+
         estimates = np.empty(symbols.size)
         decisions = np.empty((symbols.size, self.bits_per_symbol), dtype=np.bool8)
 

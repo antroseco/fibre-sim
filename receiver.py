@@ -4,7 +4,12 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
-from utils import Component, power_dbm_to_lin
+from utils import (
+    Component,
+    power_dbm_to_lin,
+    has_up_to_two_polarizations,
+    has_one_polarization,
+)
 
 
 class OpticalFrontEnd(Component):
@@ -28,8 +33,8 @@ class OpticalFrontEnd(Component):
         )
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert Efields.ndim == 1
-        assert Efields.size > 0
+        # These are simple scalar multiplications.
+        assert has_up_to_two_polarizations(Efields)
 
         # Assuming an ideal local oscillator with unit amplitude, and with
         # homodyne detection to maintain the baseband represtation, we just have
@@ -48,6 +53,8 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
         self.rng = np.random.default_rng()
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(Efields)
+
         # 50 Ω load resistor (common value).
         R_LOAD = 50
 

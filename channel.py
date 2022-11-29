@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from functools import cache
 
 import numpy as np
@@ -6,20 +5,18 @@ from numpy.typing import NDArray
 
 from utils import (
     Component,
+    energy_db_to_lin,
+    has_one_polarization,
+    has_up_to_two_polarizations,
+    is_power_of_2,
     samples_squared,
     signal_power,
-    is_power_of_2,
-    energy_db_to_lin,
 )
 
 
 class Channel(Component):
     input_type = "cd symbols"
     output_type = "cd symbols"
-
-    @abstractmethod
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert symbols.ndim == 1
 
 
 class AWGN(Channel):
@@ -35,7 +32,7 @@ class AWGN(Channel):
         self.rng = np.random.default_rng()
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        super().__call__(symbols)
+        assert has_one_polarization(symbols)
 
         # Each symbol can consist of multiple samples. The mean energy of each
         # symbol is the mean energy per sample multiplied by the number of
@@ -92,7 +89,7 @@ class SSFChannel(Channel):
         return np.fft.ifft(np.fft.fft(symbols * nonlinear_term) * linear_term)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        super().__call__(symbols)
+        assert has_one_polarization(symbols)
         # FIXME assert is_power_of_2(symbols.size)
 
         remaining_length = self.length
@@ -118,9 +115,9 @@ class Splitter(Channel):
         attenuation_dB = 3.5 * np.log2(ratio)
         attenuation = energy_db_to_lin(attenuation_dB)
 
-        self.factor = 1 / np.sqrt(attenuation)
+        self.factor: float = 1 / np.sqrt(attenuation)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        super().__call__(symbols)
+        assert has_up_to_two_polarizations(symbols)
 
         return symbols * self.factor
