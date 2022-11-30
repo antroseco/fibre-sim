@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from channel import AWGN, Splitter
+from channel import AWGN, Splitter, PolarizationRotation
 from utils import signal_energy, signal_power, energy_db_to_lin
 
 
@@ -90,3 +90,35 @@ class TestSplitter:
         expected = 3.5 * np.log2(ratio)
 
         assert np.isclose(power_in / power_out, energy_db_to_lin(expected))
+
+
+class TestPolarizationRotation:
+    @staticmethod
+    def test_conservation_of_energy():
+        rot = PolarizationRotation()
+
+        test_data = np.random.randn(128).reshape(2, 64).astype(np.cdouble)
+        test_data += 2j * test_data
+
+        rotated = rot(test_data)
+
+        assert rotated.shape == test_data.shape
+        assert rotated.dtype == test_data.dtype
+
+        assert np.isclose(signal_energy(rotated), signal_energy(test_data))
+
+    @staticmethod
+    def test_common_rotation():
+        # 90 degree rotation.
+        rot = PolarizationRotation(np.pi / 2)
+
+        test_data = np.arange(6, dtype=np.cdouble).reshape(2, 3)
+
+        rotated = rot(test_data)
+
+        assert rotated.shape == test_data.shape
+        assert rotated.dtype == test_data.dtype
+
+        assert np.isclose(signal_energy(rotated), signal_energy(test_data))
+
+        assert np.allclose(rotated, np.asarray([[-3, -4, -5], [0, 1, 2]]))

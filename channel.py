@@ -1,4 +1,5 @@
 from functools import cache
+from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -129,3 +130,24 @@ class Splitter(Channel):
         assert has_up_to_two_polarizations(symbols)
 
         return symbols * self.factor
+
+
+class PolarizationRotation(Channel):
+    def __init__(self, angle: Optional[float] = None) -> None:
+        super().__init__()
+
+        if angle is None:
+            angle = np.random.uniform(-np.pi, np.pi)
+
+        # 2D rotation matrix.
+        self.matrix = np.asarray(
+            [
+                [np.cos(angle), -np.sin(angle)],
+                [np.sin(angle), np.cos(angle)],
+            ]
+        )
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_two_polarizations(symbols)
+
+        return self.matrix @ symbols
