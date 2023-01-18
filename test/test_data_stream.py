@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
-from data_stream import PseudoRandomStream
 from numpy.typing import NDArray
+
+from data_stream import PseudoRandomStream
 
 
 def calculate_entropy(data: NDArray[np.bool8]) -> float:

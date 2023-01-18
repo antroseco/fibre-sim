@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from filters import ChromaticDispersion, PulseFilter, root_raised_cosine
 from utils import normalize_energy, signal_energy
 

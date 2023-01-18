@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from numpy.typing import NDArray
+
 from channel import AWGN
 from data_stream import PseudoRandomStream
 from filters import Decimate, PulseFilter
@@ -11,7 +13,6 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from numpy.typing import NDArray
 from system import MAX_CHUNK_SIZE, build_system
 from utils import (
     Component,

@@ -8,9 +8,9 @@ from modulation import Demodulator, Modulator
 from utils import (
     Component,
     energy_db_to_lin,
+    has_one_polarization,
     normalize_energy,
     signal_power,
-    has_one_polarization,
 )
 
 

@@ -15,8 +15,8 @@ from utils import (
     has_up_to_two_polarizations,
     normalize_power,
     overlap_save,
-    signal_energy,
     row_size,
+    signal_energy,
 )
 
 

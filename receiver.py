@@ -6,9 +6,9 @@ from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
 from utils import (
     Component,
-    power_dbm_to_lin,
-    has_up_to_two_polarizations,
     has_one_polarization,
+    has_up_to_two_polarizations,
+    power_dbm_to_lin,
 )
 
 # TODO noisy laser

@@ -3,6 +3,8 @@ from math import floor
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
+
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
@@ -11,7 +13,6 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from numpy.typing import NDArray
 
 
 def ints_to_bits(array: NDArray) -> NDArray[np.bool8]:

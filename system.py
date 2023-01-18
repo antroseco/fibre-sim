@@ -6,7 +6,6 @@ from numpy.typing import NDArray
 from data_stream import DataStream
 from utils import Component
 
-
 # This is significantly faster than larger/smaller settings. The current
 # bottleneck is the circular convolution (using fft/ifft) which is sensitive to
 # the length of the data.

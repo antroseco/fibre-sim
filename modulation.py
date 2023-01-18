@@ -5,12 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from laser import Laser
-from utils import (
-    Component,
-    has_one_polarization,
-    has_two_polarizations,
-    signal_power,
-)
+from utils import Component, has_one_polarization, signal_power
 
 
 class Modulator(Component):

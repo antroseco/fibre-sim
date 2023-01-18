@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from channel import AWGN, Splitter, PolarizationRotation
-from utils import signal_energy, signal_power, energy_db_to_lin
+from channel import AWGN, PolarizationRotation, Splitter
+from utils import energy_db_to_lin, signal_energy, signal_power
 
 
 class TestAWGN:
