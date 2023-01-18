@@ -354,4 +354,14 @@ class AdaptiveEqualizer(Component):
                 # RDE update step.
                 self.w += self.mu * x * (r**2 - np.abs(y[i]) ** 2) * np.conj(y[i])
 
+        # _, axs = plt.subplots(ncols=2, sharey=True)
+        # axs[0].scatter(range(normalized[::2].size), np.abs(normalized[::2]), alpha=0.2)
+        # axs[0].set_title("Input")
+        # axs[1].scatter(range(y.size), np.abs(y), alpha=0.2)
+        # axs[1].set_title("Output")
+        # for r in R_rde:
+        #     axs[0].axhline(r, color="orange")
+        #     axs[1].axhline(r, color="orange")
+        # plt.show()
+
         return y

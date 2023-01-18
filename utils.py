@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import overload
+from typing import Callable, overload
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -36,6 +36,11 @@ class Component(ABC):
 
 
 def plot_signal(component: str, signal: NDArray) -> None:
+    if signal.ndim == 2:
+        plot_signal(component, signal[0])
+        plot_signal(component, signal[1])
+        return
+
     assert signal.ndim == 1
     assert signal.size > 0
 
@@ -285,3 +290,21 @@ def row_size(array: NDArray) -> int:
     assert has_up_to_two_polarizations(array)
 
     return array.size if has_one_polarization(array) else array.size // 2
+
+
+def for_each_polarization(
+    fn: Callable[[Component, NDArray], NDArray]
+) -> Callable[[Component, NDArray], NDArray]:
+    def wrapper(self: Component, array: NDArray) -> NDArray:
+        # Nothing to do here.
+        if has_one_polarization(array):
+            return array
+
+        assert has_up_to_two_polarizations(array)
+
+        pol_v = fn(self, array[0])
+        pol_h = fn(self, array[1])
+
+        return np.vstack((pol_v, pol_h))
+
+    return wrapper

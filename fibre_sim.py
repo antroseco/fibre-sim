@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
-from channel import AWGN, Splitter, SSFChannel
+from channel import AWGN, PolarizationRotation, Splitter, SSFChannel
 from data_stream import PseudoRandomStream
 from filters import (
     AdaptiveEqualizer,
@@ -24,6 +24,7 @@ from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
+    DPModulator,
     IQModulator,
     Modulator,
     Modulator16QAM,
@@ -83,7 +84,10 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
     # power of 2.
     assert is_power_of_2(length)
 
-    return build_system(PseudoRandomStream(), system)(length) / length
+    return (
+        build_system(PseudoRandomStream(), system, inspector=plot_signal)(length)
+        / length
+    )
 
 
 def awgn_link(es_n0: float) -> Sequence[Component]:
@@ -137,15 +141,35 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     )
 
 
+def nonlinear_2p_link(tx_power_dbm: float) -> Sequence[Component]:
+    return (
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        DPModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
+        SSFChannel(SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
+        Splitter(CONSUMERS),
+        SSFChannel(FIBRE_LENGTH - SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
+        PolarizationRotation(),
+        NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
+        Decimate(CHANNEL_SPS // RECEIVER_SPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+    )
+
+
 def make_nonlinear_simulation(
     modulator: Type[Modulator],
     demodulator: Type[Demodulator],
+    two_polarizations: bool,
     length: int,
     tx_power_dbm: float,
 ) -> float:
     system = (
         modulator(),
-        *nonlinear_link(tx_power_dbm),
+        *(
+            nonlinear_2p_link(tx_power_dbm)
+            if two_polarizations
+            else nonlinear_link(tx_power_dbm)
+        ),
         DecisionDirected(
             modulator(),
             demodulator(),
@@ -328,13 +352,20 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     plt.show()
 
 
-def plot_nonlinear_simulations(concurrent: bool = True) -> None:
+def plot_nonlinear_simulations(
+    two_polarizations: bool = True, concurrent: bool = True
+) -> None:
     _, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated 16-QAM",)
     simulations = (
-        partial(make_nonlinear_simulation, Modulator16QAM, Demodulator16QAM),
+        partial(
+            make_nonlinear_simulation,
+            Modulator16QAM,
+            Demodulator16QAM,
+            two_polarizations,
+        ),
     )
 
     if concurrent:
@@ -600,7 +631,7 @@ def plot_dd_phase_recovery_buffer_size() -> None:
 
 def plot_step_size_comparison() -> None:
     LENGTH = 2**14
-    TX_POWER_dBm = 20
+    TX_POWER_dBm = 18
 
     hs = [50, 100, 250, 500, 1000, 2000]
 
@@ -714,4 +745,4 @@ def plot_adaptive_equalizer_comparison() -> None:
 
 
 if __name__ == "__main__":
-    plot_nonlinear_simulations()
+    plot_nonlinear_simulations(True, False)
