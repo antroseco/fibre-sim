@@ -171,15 +171,19 @@ class CDBase(Component):
 
 
 class ChromaticDispersion(CDBase):
+    @staticmethod
     @cache
-    def cd_spectrum(self, size: int) -> NDArray[np.cdouble]:
+    def cd_spectrum(
+        size: int, sampling_interval: float, K: float
+    ) -> NDArray[np.cdouble]:
+        # XXX this is a static method because of @cache, see Pylint W1518
         # This is the baseband representation of the signal, which has the same
         # bandwidth as the upconverted PAM signal. It's already centered around
         # 0, so there's no need to subtract the carrier frequency from its
         # spectrum.
-        Df = np.fft.fftfreq(size, self.sampling_interval)
+        Df = np.fft.fftfreq(size, sampling_interval)
 
-        arg = self.K * (2 * np.pi * self.sampling_interval) ** 2
+        arg = K * (2 * np.pi * sampling_interval) ** 2
 
         return np.exp(-1j * arg * Df**2)
 
@@ -188,7 +192,7 @@ class ChromaticDispersion(CDBase):
         # axis by default (axis=1, i.e. along each row).
         assert has_up_to_two_polarizations(symbols)
 
-        cd = self.cd_spectrum(row_size(symbols))
+        cd = self.cd_spectrum(row_size(symbols), self.sampling_interval, self.K)
 
         return np.fft.ifft(np.fft.fft(symbols) * cd)
 
