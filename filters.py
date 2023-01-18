@@ -65,6 +65,8 @@ class PulseFilter(Component):
         assert np.argmax(rrc) == rrc.size // 2
         assert np.isclose(signal_energy(rrc), 1)
 
+        # FIXME 2 samples per symbol but low pass filter to match the bandwidth.
+
         return rrc
 
     def upsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
@@ -307,6 +309,8 @@ class AdaptiveEqualizer(Component):
         assert taps > 0
         self.taps = taps
 
+        # FIXME 10**-2 is big, try 10**-4 to 10**-3
+        # Try correcting for chromatic dispersion (mismatch)
         assert mu > 0
         self.mu = mu
 

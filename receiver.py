@@ -11,6 +11,8 @@ from utils import (
     has_one_polarization,
 )
 
+# TODO noisy laser
+
 
 class OpticalFrontEnd(Component):
     input_type = "cd electric field"

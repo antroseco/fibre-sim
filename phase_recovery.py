@@ -152,5 +152,7 @@ class DecisionDirected(PhaseRecovery):
 
         self.last_estimates = estimates
 
+        # TODO unwrap the phase
+
         # Flatten demodulated bits.
         return np.ravel(decisions)
