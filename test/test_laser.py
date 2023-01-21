@@ -55,7 +55,7 @@ class TestNoisyLaser:
 
         phase_changes = []
 
-        for _ in range(8000):
+        for _ in range(2**14):
             result = self.laser(LENGTH)
             # Variance is very small, so we don't expect the angle to wrap
             # around.
