@@ -72,11 +72,11 @@ class ModulatorQPSK(Modulator):
         #         |
         #   11    |    01
         #         |
-        I = 1 - 2 * data[0::2]
-        Q = 1j - 2j * data[1::2]
+        in_phase = 1 - 2 * data[0::2]
+        quadrature = 1j - 2j * data[1::2]
 
         # Normalize symbol energy.
-        return (I + Q) / np.sqrt(2)
+        return (in_phase + quadrature) / np.sqrt(2)
 
 
 class DemodulatorQPSK(Demodulator):
@@ -148,15 +148,15 @@ class Modulator16QAM(Modulator):
         #              |
         #
         # In-phase component carries the 2 LSBs.
-        I = -3 + 2 * self.impl(data[2::4], data[3::4])
+        in_phase = -3 + 2 * self.impl(data[2::4], data[3::4])
         # Quadrature component carries the 2 MSBs.
-        Q = 3j - 2j * self.impl(data[0::4], data[1::4])
+        quadrature = 3j - 2j * self.impl(data[0::4], data[1::4])
 
         # Normalize symbol energy. The mean energy of the constellation is
         # defined as the expected value of |a+bj|^2. With a uniform
         # distribution over all symbols, this comes out to 10. Thus, we need to
         # divide the *amplitude* by the square root of 10.
-        return (I + Q) / np.sqrt(10)
+        return (in_phase + quadrature) / np.sqrt(10)
 
 
 class Demodulator16QAM(Demodulator):
@@ -215,9 +215,11 @@ class IQModulator(Component):
         assert has_one_polarization(laser_output)
         assert voltages.size == laser_output.size
 
+        def max_a(x: NDArray[np.float64]) -> float:
+            return np.max(np.abs(x))
+
         # Input voltage should range from -Vπ to +Vπ. Remove this restriction
         # from the caller by inferring Vπ.
-        max_a = lambda x: np.max(np.abs(x))
         Vpi = max(max_a(np.real(voltages)), max_a(np.imag(voltages)))
 
         # FIXME increase Vpi to make the cosine function look more linear. Is
