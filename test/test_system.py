@@ -32,7 +32,7 @@ class Counter(Component):
         self.calls = 0
         self.count = 0
 
-    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.bool8]:
+    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.bool_]:
         self.calls += 1
         self.count += data.size
 

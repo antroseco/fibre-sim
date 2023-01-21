@@ -15,7 +15,7 @@ from modulation import (
 )
 
 
-def ints_to_bits(array: NDArray) -> NDArray[np.bool8]:
+def ints_to_bits(array: NDArray) -> NDArray[np.bool_]:
     assert array.ndim == 1
 
     # Determine how many bits are required to represent all values.
@@ -32,7 +32,7 @@ def ints_to_bits(array: NDArray) -> NDArray[np.bool8]:
     # bitorder="little" returns the LSB first, so we need to use fliplr() to
     # bring the MSB to the front.
     # .ravel() is like .flatten() but it doesn't copy the array.
-    return np.fliplr(array).ravel().astype(np.bool8)
+    return np.fliplr(array).ravel().astype(np.bool_)
 
 
 def test_ints_to_bits():
@@ -44,7 +44,7 @@ def test_ints_to_bits():
     assert np.all(ints_to_bits(np.asarray((0, 1))) == [False, True])
 
 
-def bits_to_ints(bits: NDArray[np.bool8], bits_per_int: int) -> NDArray[np.uint8]:
+def bits_to_ints(bits: NDArray[np.bool_], bits_per_int: int) -> NDArray[np.uint8]:
     assert bits_per_int > 0
     assert bits.ndim == 1
     assert bits.size >= bits_per_int
@@ -82,7 +82,7 @@ def test_bits_to_ints():
 
     # bits can't be empty.
     with pytest.raises(Exception):
-        bits_to_ints(np.asarray((), dtype=np.bool8), 2)
+        bits_to_ints(np.asarray((), dtype=np.bool_), 2)
 
 
 class TestModulatorBPSK:
@@ -113,7 +113,7 @@ class TestDemodulatorBPSK:
         data = self.demodulator(symbols)
 
         # Check dtype.
-        assert data.dtype == np.bool8
+        assert data.dtype == np.bool_
 
         # Length should be preserved.
         assert symbols.size == data.size
@@ -133,7 +133,7 @@ class TestDemodulatorBPSK:
         rng = np.random.default_rng()
 
         # Modulation should be reversible.
-        data = rng.integers(0, 1, endpoint=True, size=LENGTH, dtype=np.bool8)
+        data = rng.integers(0, 1, endpoint=True, size=LENGTH, dtype=np.bool_)
         assert np.all(self.demodulator(modulator(data)) == data)
 
         # Small amounts of noise should not introduce any errors.
@@ -171,10 +171,10 @@ class TestModulatorQPSK:
         assert self.modulator.bits_per_symbol == 2
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(1, dtype=np.bool8))
+            self.modulator(np.zeros(1, dtype=np.bool_))
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(1001, dtype=np.bool8))
+            self.modulator(np.zeros(1001, dtype=np.bool_))
 
 
 class TestDemodulatorQPSK:
@@ -185,7 +185,7 @@ class TestDemodulatorQPSK:
         data = self.demodulator(symbols)
 
         # Check dtype.
-        assert data.dtype == np.bool8
+        assert data.dtype == np.bool_
 
         # Length should have doubled (2 bits per symbol).
         assert 2 * symbols.size == data.size
@@ -205,7 +205,7 @@ class TestDemodulatorQPSK:
         SYM_LENGTH = BIT_LENGTH // modulator.bits_per_symbol
 
         # Modulation should be reversible.
-        data = rng.integers(0, 1, endpoint=True, size=BIT_LENGTH, dtype=np.bool8)
+        data = rng.integers(0, 1, endpoint=True, size=BIT_LENGTH, dtype=np.bool_)
         assert np.all(self.demodulator(modulator(data)) == data)
 
         # Small amounts of noise should not introduce any errors.
@@ -218,8 +218,8 @@ class TestModulator16QAM:
     modulator = Modulator16QAM()
 
     def test_impl(self):
-        msbs = np.asarray((0, 0, 1, 1), dtype=np.bool8)
-        lsbs = np.asarray((0, 1, 0, 1), dtype=np.bool8)
+        msbs = np.asarray((0, 0, 1, 1), dtype=np.bool_)
+        lsbs = np.asarray((0, 1, 0, 1), dtype=np.bool_)
 
         offsets = self.modulator.impl(msbs, lsbs)
 
@@ -268,16 +268,16 @@ class TestModulator16QAM:
         assert self.modulator.bits_per_symbol == 4
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(1, dtype=np.bool8))
+            self.modulator(np.zeros(1, dtype=np.bool_))
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(2, dtype=np.bool8))
+            self.modulator(np.zeros(2, dtype=np.bool_))
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(3, dtype=np.bool8))
+            self.modulator(np.zeros(3, dtype=np.bool_))
 
         with pytest.raises(Exception):
-            self.modulator(np.zeros(1001, dtype=np.bool8))
+            self.modulator(np.zeros(1001, dtype=np.bool_))
 
 
 class TestDemodulator16QAM:
@@ -297,7 +297,7 @@ class TestDemodulator16QAM:
         data = self.demodulator(symbols)
 
         # Check dtype.
-        assert data.dtype == np.bool8
+        assert data.dtype == np.bool_
 
         # Length should have quadrupled (4 bits per symbol).
         assert 4 * symbols.size == data.size
@@ -329,7 +329,7 @@ class TestDemodulator16QAM:
         SYM_LENGTH = BIT_LENGTH // modulator.bits_per_symbol
 
         # Modulation should be reversible.
-        data = rng.integers(0, 1, endpoint=True, size=BIT_LENGTH, dtype=np.bool8)
+        data = rng.integers(0, 1, endpoint=True, size=BIT_LENGTH, dtype=np.bool_)
         assert np.all(self.demodulator(modulator(data)) == data)
 
         # Small amounts of noise should not introduce any errors.

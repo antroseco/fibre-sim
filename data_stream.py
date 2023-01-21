@@ -15,11 +15,11 @@ class DataStream(ABC):
         self.bit_errors: int = 0
 
     @abstractmethod
-    def generate(self, length: int) -> NDArray[np.bool8]:
+    def generate(self, length: int) -> NDArray[np.bool_]:
         pass
 
     @abstractmethod
-    def validate(self, data: NDArray[np.bool8]) -> int:
+    def validate(self, data: NDArray[np.bool_]) -> int:
         pass
 
 
@@ -27,18 +27,18 @@ class PseudoRandomStream(DataStream):
     def __init__(self) -> None:
         super().__init__()
 
-        self.last_chunk: Optional[NDArray[np.bool8]] = None
+        self.last_chunk: Optional[NDArray[np.bool_]] = None
         self.rng = np.random.default_rng()
         self.lag_cache: dict[int, int] = {}
 
-    def generate(self, length: int) -> NDArray[np.bool8]:
+    def generate(self, length: int) -> NDArray[np.bool_]:
         self.last_chunk = self.rng.integers(
-            0, 1, endpoint=True, size=length, dtype=np.bool8
+            0, 1, endpoint=True, size=length, dtype=np.bool_
         )
 
         return self.last_chunk
 
-    def validate(self, data: NDArray[np.bool8]) -> None:
+    def validate(self, data: NDArray[np.bool_]) -> None:
         assert self.last_chunk is not None
         assert data.size == self.last_chunk.size
 

@@ -5,11 +5,11 @@ from numpy.typing import NDArray
 from data_stream import PseudoRandomStream
 
 
-def calculate_entropy(data: NDArray[np.bool8]) -> float:
+def calculate_entropy(data: NDArray[np.bool_]) -> float:
     _, counts = np.unique(data, return_counts=True)
     frequencies = counts / np.sum(counts)
 
-    return -np.sum(frequencies * np.log2(frequencies))
+    return -np.sum(frequencies * np.log2(frequencies)).astype(float)
 
 
 class TestPseudoRandomStream:
@@ -22,7 +22,7 @@ class TestPseudoRandomStream:
         second = stream.generate(LENGTH)
 
         # Check dtype.
-        assert first.dtype == second.dtype == np.bool8
+        assert first.dtype == second.dtype == np.bool_
 
         # Check that it respects the length argument.
         assert first.size == second.size == LENGTH
@@ -41,7 +41,7 @@ class TestPseudoRandomStream:
 
         # validate() should throw if it's called before generate().
         with pytest.raises(Exception):
-            stream.validate(np.zeros(LENGTH, dtype=np.bool8))
+            stream.validate(np.zeros(LENGTH, dtype=np.bool_))
 
         # Now it should be fine; and it should report zero errors.
         data = stream.generate(LENGTH)
@@ -56,11 +56,11 @@ class TestPseudoRandomStream:
         # It should also throw if the lengths don't match.
         stream.generate(LENGTH)
         with pytest.raises(Exception):
-            stream.validate(np.zeros(2 * LENGTH, dtype=np.bool8))
+            stream.validate(np.zeros(2 * LENGTH, dtype=np.bool_))
 
         # Finally test if errors are counted correctly.
-        stream.last_chunk = np.zeros(4, dtype=np.bool8)
-        stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool8))
+        stream.last_chunk = np.zeros(4, dtype=np.bool_)
+        stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool_))
 
         assert stream.bit_errors == 2
 

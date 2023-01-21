@@ -123,11 +123,11 @@ class DecisionDirected(PhaseRecovery):
 
         return w_ml
 
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool8]:
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool_]:
         assert has_one_polarization(symbols)
 
         estimates = np.empty(symbols.size)
-        decisions = np.empty((symbols.size, self.bits_per_symbol), dtype=np.bool8)
+        decisions = np.empty((symbols.size, self.bits_per_symbol), dtype=np.bool_)
 
         shift_register = np.ones(self.buffer_size, np.cdouble)
 

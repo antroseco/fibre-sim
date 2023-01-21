@@ -15,8 +15,8 @@ class Modulator(Component):
     bits_per_symbol: int = 0
 
     @abstractmethod
-    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
-        assert data.dtype == np.bool8
+    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
+        assert data.dtype == np.bool_
         assert data.size % self.bits_per_symbol == 0
 
 
@@ -29,14 +29,14 @@ class Demodulator(Component):
     @abstractmethod
     def __call__(
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
-    ) -> NDArray[np.bool8]:
+    ) -> NDArray[np.bool_]:
         assert symbols.dtype == np.cdouble
 
 
 class ModulatorBPSK(Modulator):
     bits_per_symbol = 1
 
-    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
+    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
         super().__call__(data)
         assert has_one_polarization(data)
 
@@ -49,7 +49,7 @@ class DemodulatorBPSK(Demodulator):
 
     def __call__(
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
-    ) -> NDArray[np.bool8]:
+    ) -> NDArray[np.bool_]:
         super().__call__(symbols)
         assert has_one_polarization(symbols)
 
@@ -59,7 +59,7 @@ class DemodulatorBPSK(Demodulator):
 class ModulatorQPSK(Modulator):
     bits_per_symbol = 2
 
-    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
+    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
         super().__call__(data)
         assert has_one_polarization(data)
 
@@ -84,7 +84,7 @@ class DemodulatorQPSK(Demodulator):
 
     def __call__(
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
-    ) -> NDArray[np.bool8]:
+    ) -> NDArray[np.bool_]:
         super().__call__(symbols)
         assert has_one_polarization(symbols)
 
@@ -93,7 +93,7 @@ class DemodulatorQPSK(Demodulator):
         # Quadrature component is the LSB.
         lsb = np.imag(symbols) < 0
 
-        data = np.empty(msb.size + lsb.size, dtype=np.bool8)
+        data = np.empty(msb.size + lsb.size, dtype=np.bool_)
         data[0::2] = msb
         data[1::2] = lsb
 
@@ -104,7 +104,7 @@ class Modulator16QAM(Modulator):
     bits_per_symbol = 4
 
     @staticmethod
-    def impl(msbs: NDArray[np.bool8], lsbs: NDArray[np.bool8]) -> NDArray[np.float64]:
+    def impl(msbs: NDArray[np.bool_], lsbs: NDArray[np.bool_]) -> NDArray[np.float64]:
         assert msbs.size == lsbs.size
 
         # Looking at the two LSBs of the constellation symbols, we can see that
@@ -126,7 +126,7 @@ class Modulator16QAM(Modulator):
 
         return offsets
 
-    def __call__(self, data: NDArray[np.bool8]) -> NDArray[np.cdouble]:
+    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
         super().__call__(data)
         assert has_one_polarization(data)
 
@@ -165,7 +165,7 @@ class Demodulator16QAM(Demodulator):
     @staticmethod
     def impl(
         symbols: NDArray[np.float64], scale: float
-    ) -> tuple[NDArray[np.bool8], NDArray[np.bool8]]:
+    ) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
         # FIXME explanation. Replace magic numbers.
         msbs = symbols > 0
         lsbs = np.abs(symbols) <= (2 * scale / np.sqrt(10))
@@ -174,7 +174,7 @@ class Demodulator16QAM(Demodulator):
 
     def __call__(
         self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
-    ) -> NDArray[np.bool8]:
+    ) -> NDArray[np.bool_]:
         super().__call__(symbols)
         assert has_one_polarization(symbols)
 
@@ -191,7 +191,7 @@ class Demodulator16QAM(Demodulator):
 
         # Each symbols carries 4 bits. The in-phase component contains the 2
         # LSBs, and the quadrature component contains the 2 MSBs.
-        data = np.empty(symbols.size * self.bits_per_symbol, dtype=np.bool8)
+        data = np.empty(symbols.size * self.bits_per_symbol, dtype=np.bool_)
         data[0::4], data[1::4] = self.impl(-np.imag(symbols), scale)
         data[2::4], data[3::4] = self.impl(np.real(symbols), scale)
 
