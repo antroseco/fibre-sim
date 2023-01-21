@@ -43,6 +43,8 @@ from utils import (
     plot_signal,
 )
 
+plt.rcParams.update({"font.size": 14})
+
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
 # At Eb/N0 = 10 dB, we need around 49 taps at 25 km, 79 taps at 50 km, and 143
