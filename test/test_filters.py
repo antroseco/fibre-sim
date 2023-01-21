@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from filters import ChromaticDispersion, PulseFilter, root_raised_cosine
+from filters import CDCompensator, ChromaticDispersion, PulseFilter, root_raised_cosine
 from utils import normalize_energy, signal_energy
 
 # TODO
@@ -155,15 +155,16 @@ class TestPulseFilter:
 
 
 class TestChromaticDispersion:
-    # 50 GigaSymbols/s at 8 samples per symbol.
-    cd = ChromaticDispersion(50e3, 50e9 * 8)
+    SAMPLES_PER_SYMBOL = 4
+    cd = ChromaticDispersion(10e3, 50e9 * SAMPLES_PER_SYMBOL)
+    compensator = CDCompensator(10e3, 50e9 * SAMPLES_PER_SYMBOL, SAMPLES_PER_SYMBOL, 63)
 
     def test_spectrum(self):
         LENGTH = 2**10
         rng = np.random.default_rng()
 
         real = rng.uniform(-2, 2, size=LENGTH)
-        imag = rng.integers(-2, 2, size=LENGTH)
+        imag = rng.uniform(-2, 2, size=LENGTH)
         data = real + 1j * imag
 
         result = self.cd(data)
@@ -180,3 +181,27 @@ class TestChromaticDispersion:
         # Only the phase of each component should had changed.
         assert np.allclose(np.abs(result_fft), np.abs(data_fft))
         assert np.any(np.angle(result_fft) != np.angle(data_fft))
+
+    def test_compensator(self):
+        LENGTH = 2**10
+        rng = np.random.default_rng()
+
+        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        data = real + 1j * imag
+
+        up = PulseFilter(self.SAMPLES_PER_SYMBOL, up=self.SAMPLES_PER_SYMBOL)(data)
+        dispersed = self.cd(up)
+
+        assert np.all(np.isfinite(dispersed))
+        assert dispersed.size == up.size
+
+        filtered = self.compensator(dispersed)
+
+        assert np.all(np.isfinite(filtered))
+        assert filtered.size == dispersed.size
+
+        # We haven't recovered the transmitted data perfectly, but hopefully
+        # it's good enough.
+        assert np.corrcoef(up, filtered)[1, 0] > 0.95
+        assert np.isclose(signal_energy(up), signal_energy(filtered), rtol=0.01)
