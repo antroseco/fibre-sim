@@ -251,7 +251,7 @@ class CDCompensator(CDBase):
         # column.
         n = np.arange(self.fir_length)
 
-        first_column = np.empty_like(n)
+        first_column = np.empty_like(n, dtype=np.float64)
         first_column[0] = self.omega / np.pi  # n = 0 is a special case.
         first_column[1:] = np.sin(n[1:] * self.omega) / (n[1:] * np.pi)
 
