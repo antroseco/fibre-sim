@@ -205,3 +205,17 @@ class TestChromaticDispersion:
         # it's good enough.
         assert np.corrcoef(up, filtered)[1, 0] > 0.95
         assert np.isclose(signal_energy(up), signal_energy(filtered), rtol=0.01)
+
+    def test_compensator_q(self):
+        n, m = np.indices((self.compensator.fir_length, self.compensator.fir_length))
+        i = m - n
+
+        with np.errstate(divide="ignore"):
+            q_expected = (
+                np.exp(1j * i * self.compensator.omega)
+                - np.exp(-1j * i * self.compensator.omega)
+            ) / (2j * np.pi * i)
+
+        np.fill_diagonal(q_expected, self.compensator.omega / np.pi)
+
+        assert np.allclose(q_expected, self.compensator.Q)
