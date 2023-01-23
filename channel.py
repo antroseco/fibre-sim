@@ -64,9 +64,11 @@ class SSFChannel(Channel):
         assert sampling_rate > 0
         self.sampling_interval = 1 / sampling_rate
 
-    @classmethod
+    @staticmethod
     @cache
-    def get_linear_arg(cls, size: int, sampling_interval: float) -> NDArray[np.float64]:
+    def get_linear_arg(
+        size: int, sampling_interval: float, beta_2: float, attenuation: float
+    ) -> NDArray[np.cdouble]:
         # This is the baseband representation of the signal, which has the same
         # bandwidth as the upconverted PAM signal. It's already centered around
         # 0, so there's no need to subtract the carrier frequency from its
@@ -74,7 +76,7 @@ class SSFChannel(Channel):
         # TODO unify with ChromaticDispersion implementation.
         Df = np.fft.fftfreq(size, sampling_interval)
         # FIXME sign convention (pretty sure this should be positive).
-        return 4j * np.pi**2 * cls.BETA_2 * Df**2 + cls.ATTENUATION
+        return 4j * np.pi**2 * beta_2 * Df**2 + attenuation
 
     def split_step_impl(
         self, symbols: NDArray[np.cdouble], step_size: int
@@ -89,7 +91,9 @@ class SSFChannel(Channel):
         )
 
         # Linear term.
-        linear_arg = self.get_linear_arg(row_size(symbols), self.sampling_interval)
+        linear_arg = self.get_linear_arg(
+            row_size(symbols), self.sampling_interval, self.BETA_2, self.ATTENUATION
+        )
         linear_term = np.exp(linear_arg * (-step_size / 2))
         # FIXME Check that power is preserved with attenuation=0.
         # Then check that power drops off as you'd expect with attenuation.
