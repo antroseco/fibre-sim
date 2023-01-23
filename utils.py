@@ -212,7 +212,7 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
 def samples_squared(signal: NDArray) -> NDArray[np.float64]:
     assert has_up_to_two_polarizations(signal)
 
-    squares = np.real(np.conj(signal) * signal)
+    squares = np.real(np.conj(signal) * signal).astype(np.float64, copy=False)
 
     if has_two_polarizations(signal):
         # Sum both polarizations.
@@ -223,12 +223,12 @@ def samples_squared(signal: NDArray) -> NDArray[np.float64]:
 
 def signal_energy(signal: NDArray, sampling_interval: float = 1) -> float:
     # Energy is proportional to the time between samples.
-    return sampling_interval * np.sum(samples_squared(signal))
+    return sampling_interval * np.sum(samples_squared(signal)).astype(float)
 
 
 def signal_power(signal: NDArray) -> float:
     # Power is simply the mean squared sample. Time cancels out.
-    return np.mean(samples_squared(signal))
+    return np.mean(samples_squared(signal)).astype(float)
 
 
 def normalize_energy(signal: NDArray) -> NDArray:
