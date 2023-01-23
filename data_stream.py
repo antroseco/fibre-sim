@@ -22,6 +22,9 @@ class DataStream(ABC):
     def validate(self, data: NDArray[np.bool_]) -> int:
         pass
 
+    def reset(self) -> None:
+        self.bit_errors = 0
+
 
 class PseudoRandomStream(DataStream):
     def __init__(self) -> None:

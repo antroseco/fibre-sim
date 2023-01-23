@@ -38,6 +38,10 @@ def build_system(
         return y
 
     def simulate_system(bit_count: int) -> int:
+        # If we don't reset the data stream, we'll count errors from a previous
+        # simulation of the same system.
+        data_stream.reset()
+
         while bit_count:
             chunk_size = min(bit_count, MAX_CHUNK_SIZE)
 
