@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from channel import SSFChannel
 from filters import CDCompensator, ChromaticDispersion, PulseFilter, root_raised_cosine
@@ -10,6 +11,20 @@ from utils import normalize_energy, signal_energy
 # test for pulse bandwidth
 # test for perfect recovery in the absence of noise
 # test against the spectrum/series given for the raised cosine
+
+
+def generate_random_data(length: int) -> NDArray[np.cdouble]:
+    rng = np.random.default_rng()
+
+    real = rng.integers(-2, 2, endpoint=True, size=length)
+    imag = rng.integers(-2, 2, endpoint=True, size=length)
+
+    return real + 1j * imag
+
+
+def generate_random_pulses(length: int, samples_per_symbol: int) -> NDArray[np.cdouble]:
+    data = generate_random_data(length)
+    return PulseFilter(samples_per_symbol, up=samples_per_symbol)(data)
 
 
 class TestRootRaisedCosine:
@@ -129,12 +144,7 @@ class TestPulseFilter:
     @staticmethod
     @pytest.mark.parametrize("samples_per_symbol", (2, 4, 8, 16))
     def test_round_trip(samples_per_symbol: int):
-        LENGTH = 2**10
-        rng = np.random.default_rng()
-
-        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        data = real + 1j * imag
+        data = generate_random_data(2**10)
 
         up = PulseFilter(samples_per_symbol, up=samples_per_symbol)(data)
 
@@ -161,20 +171,15 @@ class TestChromaticDispersion:
     compensator = CDCompensator(10e3, 50e9 * SAMPLES_PER_SYMBOL, SAMPLES_PER_SYMBOL, 63)
 
     def test_spectrum(self):
-        LENGTH = 2**10
-        rng = np.random.default_rng()
+        up = generate_random_pulses(2**10, self.SAMPLES_PER_SYMBOL)
 
-        real = rng.uniform(-2, 2, size=LENGTH)
-        imag = rng.uniform(-2, 2, size=LENGTH)
-        data = real + 1j * imag
+        dispersed = self.cd(up)
 
-        result = self.cd(data)
+        assert np.all(np.isfinite(dispersed))
+        assert dispersed.size == up.size
 
-        assert np.all(np.isfinite(result))
-        assert result.size == data.size
-
-        data_fft = np.fft.fft(data)
-        result_fft = np.fft.fft(result)
+        data_fft = np.fft.fft(up)
+        result_fft = np.fft.fft(dispersed)
 
         assert np.all(np.isfinite(data_fft))
         assert np.all(np.isfinite(result_fft))
@@ -184,14 +189,8 @@ class TestChromaticDispersion:
         assert np.any(np.angle(result_fft) != np.angle(data_fft))
 
     def test_compensator(self):
-        LENGTH = 2**10
-        rng = np.random.default_rng()
+        up = generate_random_pulses(2**10, self.SAMPLES_PER_SYMBOL)
 
-        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        data = real + 1j * imag
-
-        up = PulseFilter(self.SAMPLES_PER_SYMBOL, up=self.SAMPLES_PER_SYMBOL)(data)
         dispersed = self.cd(up)
 
         assert np.all(np.isfinite(dispersed))
@@ -228,14 +227,7 @@ class TestSSFChannel:
 
     @pytest.mark.parametrize("attenuation", (0.0, 1e-4, 1e-3, 2e-3))
     def test_attenuation(self, attenuation: float) -> None:
-        LENGTH = 2**10
-        rng = np.random.default_rng()
-
-        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
-        data = real + 1j * imag
-
-        tx = PulseFilter(2, up=2)(data)
+        tx = generate_random_pulses(2**10, 2)
 
         self.channel.ATTENUATION = attenuation
         rx = self.channel(tx)
