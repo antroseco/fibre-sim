@@ -192,7 +192,7 @@ def run_awgn_simulation(
 def run_nonlinear_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     simulation: Callable[[int, float], float],
-) -> tuple[NDArray[np.int64], list[float]]:
+) -> tuple[NDArray[np.float64], list[float]]:
     LENGTH = 2**16  # 65,536
 
     tx_power_dbms = np.linspace(-10, 15, 8, endpoint=True)
