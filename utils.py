@@ -12,23 +12,30 @@ class Component(ABC):
     input_type = None
     output_type = None
 
-    # Carrier wavelength = 1550 nm.
-    WAVELENGTH = 1550e-9
+    def __init__(self) -> None:
+        super().__init__()
 
-    # α = 0.2 dB/km at λ = 1550 nm according to Digital Coherent Optical
-    # Systems.
-    ATTENUATION = 0.2 / (1e4 * np.log10(np.e))  # Np/m
+        # Carrier wavelength = 1550 nm.
+        self.WAVELENGTH = 1550e-9
 
-    # D = 17 ps/nm/km at λ = 1550 nm according to Digital Coherent Optical
-    # Systems.
-    GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)  # s/m^2
+        # α = 0.2 dB/km at λ = 1550 nm according to Digital Coherent Optical
+        # Systems.
+        self.ATTENUATION: float = 0.2 / (1e4 * np.log10(np.e))  # Np/m
 
-    BETA_2 = -GROUP_VELOCITY_DISPERSION * WAVELENGTH**2 / (2 * np.pi * speed_of_light)
+        # D = 17 ps/nm/km at λ = 1550 nm according to Digital Coherent Optical
+        # Systems.
+        self.GROUP_VELOCITY_DISPERSION = 17 * 1e-12 / (1e-9 * 1e3)  # s/m^2
 
-    # γ = 1.3 /W*km (roughly) according to Digital Coherent Optical Systems.
-    # This includes information about the effective area and the nonlinear index
-    # of the fibre, as well as the wavelength.
-    NONLINEAR_PARAMETER = 1.3e-3  # /W*m
+        self.BETA_2 = (
+            -self.GROUP_VELOCITY_DISPERSION
+            * self.WAVELENGTH**2
+            / (2 * np.pi * speed_of_light)
+        )
+
+        # γ = 1.3 /W*km (roughly) according to Digital Coherent Optical Systems.
+        # This includes information about the effective area and the nonlinear index
+        # of the fibre, as well as the wavelength.
+        self.NONLINEAR_PARAMETER = 1.3e-3  # /W*m
 
     @abstractmethod
     def __call__(self, data: NDArray) -> NDArray:
