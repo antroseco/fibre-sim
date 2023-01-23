@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from channel import SSFChannel
 from filters import CDCompensator, ChromaticDispersion, PulseFilter, root_raised_cosine
 from utils import normalize_energy, signal_energy
 
@@ -210,7 +211,7 @@ class TestChromaticDispersion:
         n, m = np.indices((self.compensator.fir_length, self.compensator.fir_length))
         i = m - n
 
-        with np.errstate(divide="ignore"):
+        with np.errstate(invalid="ignore"):
             q_expected = (
                 np.exp(1j * i * self.compensator.omega)
                 - np.exp(-1j * i * self.compensator.omega)
@@ -219,3 +220,29 @@ class TestChromaticDispersion:
         np.fill_diagonal(q_expected, self.compensator.omega / np.pi)
 
         assert np.allclose(q_expected, self.compensator.Q)
+
+
+class TestSSFChannel:
+    FIBRE_LENGTH = 25_000
+    channel = SSFChannel(FIBRE_LENGTH, 10**11)
+
+    @pytest.mark.parametrize("attenuation", (0.0, 1e-4, 1e-3, 2e-3))
+    def test_attenuation(self, attenuation: float) -> None:
+        LENGTH = 2**10
+        rng = np.random.default_rng()
+
+        real = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        imag = rng.integers(-2, 2, endpoint=True, size=LENGTH)
+        data = real + 1j * imag
+
+        tx = PulseFilter(2, up=2)(data)
+
+        self.channel.ATTENUATION = attenuation
+        rx = self.channel(tx)
+
+        assert np.all(np.isfinite(rx))
+        assert rx.size == tx.size
+
+        # Energy should follow Beer's law.
+        expected_energy = signal_energy(tx) * np.exp(-attenuation * self.FIBRE_LENGTH)
+        assert np.isclose(expected_energy, signal_energy(rx))
