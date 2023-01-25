@@ -211,6 +211,7 @@ class CDCompensator(CDBase):
         sampling_rate: float,
         samples_per_symbol: int,
         fir_length: int,
+        pulse_filter_beta: float = PulseFilter.BETA,
     ) -> None:
         super().__init__(length, sampling_rate)
 
@@ -222,6 +223,9 @@ class CDCompensator(CDBase):
         assert fir_length >= 3
         assert fir_length % 2 == 1
         self.fir_length = fir_length
+
+        assert 0 <= pulse_filter_beta <= 1
+        self.beta = pulse_filter_beta
 
     @cached_property
     def D(self) -> NDArray[np.cdouble]:
@@ -243,7 +247,7 @@ class CDCompensator(CDBase):
 
     @cached_property
     def omega(self) -> float:
-        return np.pi * (1 + PulseFilter.BETA) / self.samples_per_symbol
+        return np.pi * (1 + self.beta) / self.samples_per_symbol
 
     @cached_property
     def Q(self) -> NDArray[np.float64]:
