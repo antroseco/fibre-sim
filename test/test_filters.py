@@ -189,7 +189,7 @@ class TestChromaticDispersion:
         assert np.any(np.angle(result_fft) != np.angle(data_fft))
 
     def test_compensator(self):
-        up = generate_random_pulses(2**10, self.SAMPLES_PER_SYMBOL)
+        up = generate_random_pulses(2**12, self.SAMPLES_PER_SYMBOL)
 
         dispersed = self.cd(up)
 
