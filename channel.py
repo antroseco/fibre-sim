@@ -66,8 +66,12 @@ class SSFChannel(Channel):
 
     @staticmethod
     @cache
-    def get_linear_arg(
-        size: int, sampling_interval: float, beta_2: float, attenuation: float
+    def get_linear_term(
+        size: int,
+        sampling_interval: float,
+        beta_2: float,
+        attenuation: float,
+        step_size: int,
     ) -> NDArray[np.cdouble]:
         # This is the baseband representation of the signal, which has the same
         # bandwidth as the upconverted PAM signal. It's already centered around
@@ -75,8 +79,9 @@ class SSFChannel(Channel):
         # spectrum.
         # TODO unify with ChromaticDispersion implementation.
         Df = np.fft.fftfreq(size, sampling_interval)
-        # FIXME sign convention (pretty sure this should be positive).
-        return 4j * np.pi**2 * beta_2 * Df**2 + attenuation
+        return np.exp(
+            (-step_size / 2) * (4j * np.pi**2 * beta_2 * Df**2 + attenuation)
+        )
 
     def split_step_impl(
         self, symbols: NDArray[np.cdouble], step_size: int
@@ -91,16 +96,14 @@ class SSFChannel(Channel):
         )
 
         # Linear term.
-        linear_arg = self.get_linear_arg(
-            row_size(symbols), self.sampling_interval, self.BETA_2, self.ATTENUATION
+        linear_term = self.get_linear_term(
+            row_size(symbols),
+            self.sampling_interval,
+            self.BETA_2,
+            self.ATTENUATION,
+            step_size,
         )
-        linear_term = np.exp(linear_arg * (-step_size / 2))
-        # FIXME Check that power is preserved with attenuation=0.
-        # Then check that power drops off as you'd expect with attenuation.
-        # Try turning off linear or non-linear terms individually (they should
-        # be independent of step size on their own).
 
-        # TODO investigate symmetrized schemes.
         return np.fft.ifft(np.fft.fft(symbols * nonlinear_term) * linear_term)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
