@@ -185,7 +185,7 @@ class ChromaticDispersion(CDBase):
 
         arg = K * (2 * np.pi * sampling_interval) ** 2
 
-        return np.exp(-1j * arg * Df**2)
+        return np.exp(1j * arg * Df**2)
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # fft and ifft work just fine with 2D arrays. They operate on the last
@@ -259,12 +259,19 @@ class CDCompensator(CDBase):
         first_column[0] = self.omega / np.pi  # n = 0 is a special case.
         first_column[1:] = np.sin(n[1:] * self.omega) / (n[1:] * np.pi)
 
-        # FIXME epsilon term.
-        return toeplitz(first_column) + np.eye(self.fir_length)
+        return toeplitz(first_column)
 
     @cached_property
     def h(self) -> NDArray[np.cdouble]:
-        return np.linalg.solve(self.Q, self.D)
+        # Matrix becomes singular *very* quickly.
+        # QQ = self.Q + 1e-14 * np.eye(self.fir_length)
+        # print(QQ.shape, np.linalg.matrix_rank(QQ))
+        # print(np.linalg.det(QQ))
+        # print(np.linalg.cond(QQ))
+
+        # FIXME Paper uses ε = 1e-14, although there is some flexibility.
+        # return np.linalg.solve(self.Q + np.eye(self.fir_length), self.D)
+        return np.conj(np.linalg.lstsq(self.Q, self.D, rcond=0.9)[0])
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
