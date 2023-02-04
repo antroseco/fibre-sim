@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from math import floor
 from typing import overload
 
 import numpy as np
@@ -292,3 +293,43 @@ def row_size(array: NDArray) -> int:
     assert has_up_to_two_polarizations(array)
 
     return array.size if has_one_polarization(array) else array.size // 2
+
+
+def ints_to_bits(array: NDArray) -> NDArray[np.bool_]:
+    assert array.ndim == 1
+
+    # Determine how many bits are required to represent all values.
+    # The call to max() protects against cases where the greatest value is 0.
+    bit_count = floor(np.log2(max(array.max(), 1))) + 1
+
+    # Place each element in its own row. The count argument in unpackbits()
+    # doesn't do what we want it do otherwise.
+    array = np.reshape(array, (array.size, 1)).astype(np.uint8)
+
+    # Unpack each row individually.
+    array = np.unpackbits(array, axis=1, count=bit_count, bitorder="little")
+
+    # bitorder="little" returns the LSB first, so we need to use fliplr() to
+    # bring the MSB to the front.
+    # .ravel() is like .flatten() but it doesn't copy the array.
+    return np.fliplr(array).ravel().astype(np.bool_)
+
+
+def bits_to_ints(bits: NDArray[np.bool_], bits_per_int: int) -> NDArray[np.uint8]:
+    assert bits_per_int > 0
+    assert bits.ndim == 1
+    assert bits.size >= bits_per_int
+    assert bits.size % bits_per_int == 0
+
+    # The bits of each int must be in a different row, otherwise packbits() will
+    # pack them all together.
+    bits = np.reshape(bits, (bits.size // bits_per_int, bits_per_int))
+
+    # packbits() pads bit counts less than 8 by adding zero bits at the end.
+    # This means that [1, 1, 0, 0] will be interpreted as 0b1100000 instead of
+    # 0b00001100. We can use bitorder="little" to ensure that the padded zero
+    # bits at the end are the MSBs, but then we have to flip the bit order, such
+    # that we pass in [0, 0, 1, 1] instead.
+    bits = np.fliplr(bits)
+
+    return np.packbits(bits, axis=1, bitorder="little").ravel()

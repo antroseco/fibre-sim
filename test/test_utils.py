@@ -6,8 +6,10 @@ import pytest
 from scipy.signal import convolve, lfilter
 
 from utils import (
+    bits_to_ints,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
+    ints_to_bits,
     is_power_of_2,
     next_power_of_2,
     normalize_energy,
@@ -189,3 +191,33 @@ class TestEnergy:
 
         assert np.isfinite(result)
         assert np.isclose(result, expected)
+
+
+def test_ints_to_bits():
+    # Test that bits are returned in the correct order (MSB first).
+    assert np.all(ints_to_bits(np.asarray((6,))) == [True, True, False])
+
+    # Test automatic width detection
+    assert np.all(ints_to_bits(np.asarray((2, 1))) == [True, False, False, True])
+    assert np.all(ints_to_bits(np.asarray((0, 1))) == [False, True])
+
+
+def test_bits_to_ints():
+    bits = np.asarray((True, False, True, False))
+
+    # Test that bits are interpreted correctly (first one is MSB).
+    assert np.all(bits_to_ints(bits, 1) == [1, 0, 1, 0])
+    assert np.all(bits_to_ints(bits, 2) == [2, 2])
+    assert np.all(bits_to_ints(bits, 4) == [10])
+
+    # Size of bits must be a multiple of bits_per_int.
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 0)
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 3)
+    with pytest.raises(Exception):
+        bits_to_ints(bits, 5)
+
+    # bits can't be empty.
+    with pytest.raises(Exception):
+        bits_to_ints(np.asarray((), dtype=np.bool_), 2)

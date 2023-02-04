@@ -1,9 +1,7 @@
 from itertools import product
-from math import floor
 
 import numpy as np
 import pytest
-from numpy.typing import NDArray
 
 from modulation import (
     Demodulator16QAM,
@@ -13,76 +11,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-
-
-def ints_to_bits(array: NDArray) -> NDArray[np.bool_]:
-    assert array.ndim == 1
-
-    # Determine how many bits are required to represent all values.
-    # The call to max() protects against cases where the greatest value is 0.
-    bit_count = floor(np.log2(max(array.max(), 1))) + 1
-
-    # Place each element in its own row. The count argument in unpackbits()
-    # doesn't do what we want it do otherwise.
-    array = np.reshape(array, (array.size, 1)).astype(np.uint8)
-
-    # Unpack each row individually.
-    array = np.unpackbits(array, axis=1, count=bit_count, bitorder="little")
-
-    # bitorder="little" returns the LSB first, so we need to use fliplr() to
-    # bring the MSB to the front.
-    # .ravel() is like .flatten() but it doesn't copy the array.
-    return np.fliplr(array).ravel().astype(np.bool_)
-
-
-def test_ints_to_bits():
-    # Test that bits are returned in the correct order (MSB first).
-    assert np.all(ints_to_bits(np.asarray((6,))) == [True, True, False])
-
-    # Test automatic width detection
-    assert np.all(ints_to_bits(np.asarray((2, 1))) == [True, False, False, True])
-    assert np.all(ints_to_bits(np.asarray((0, 1))) == [False, True])
-
-
-def bits_to_ints(bits: NDArray[np.bool_], bits_per_int: int) -> NDArray[np.uint8]:
-    assert bits_per_int > 0
-    assert bits.ndim == 1
-    assert bits.size >= bits_per_int
-    assert bits.size % bits_per_int == 0
-
-    # The bits of each int must be in a different row, otherwise packbits() will
-    # pack them all together.
-    bits = np.reshape(bits, (bits.size // bits_per_int, bits_per_int))
-
-    # packbits() pads bit counts less than 8 by adding zero bits at the end.
-    # This means that [1, 1, 0, 0] will be interpreted as 0b1100000 instead of
-    # 0b00001100. We can use bitorder="little" to ensure that the padded zero
-    # bits at the end are the MSBs, but then we have to flip the bit order, such
-    # that we pass in [0, 0, 1, 1] instead.
-    bits = np.fliplr(bits)
-
-    return np.packbits(bits, axis=1, bitorder="little").ravel()
-
-
-def test_bits_to_ints():
-    bits = np.asarray((True, False, True, False))
-
-    # Test that bits are interpreted correctly (first one is MSB).
-    assert np.all(bits_to_ints(bits, 1) == [1, 0, 1, 0])
-    assert np.all(bits_to_ints(bits, 2) == [2, 2])
-    assert np.all(bits_to_ints(bits, 4) == [10])
-
-    # Size of bits must be a multiple of bits_per_int.
-    with pytest.raises(Exception):
-        bits_to_ints(bits, 0)
-    with pytest.raises(Exception):
-        bits_to_ints(bits, 3)
-    with pytest.raises(Exception):
-        bits_to_ints(bits, 5)
-
-    # bits can't be empty.
-    with pytest.raises(Exception):
-        bits_to_ints(np.asarray((), dtype=np.bool_), 2)
+from utils import bits_to_ints, ints_to_bits
 
 
 class TestModulatorBPSK:
