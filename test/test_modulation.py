@@ -19,7 +19,7 @@ class TestModulatorBPSK:
     modulator = ModulatorBPSK()
 
     def test_mapping(self):
-        data = ints_to_bits(np.arange(2))
+        data = ints_to_bits(np.arange(2), 1)
         symbols = self.modulator(data)
 
         # Check dtype.
@@ -75,7 +75,7 @@ class TestModulatorQPSK:
     modulator = ModulatorQPSK()
 
     def test_mapping(self):
-        data = ints_to_bits(np.arange(4))
+        data = ints_to_bits(np.arange(4), 2)
         symbols = self.modulator(data)
 
         # Check dtype.
@@ -174,7 +174,7 @@ class TestDemodulatorDQPSK:
         )
         # fmt: on
 
-        symbols = ModulatorQPSK()(ints_to_bits(data))
+        symbols = ModulatorQPSK()(ints_to_bits(data, 2))
 
         assert symbols.dtype == np.cdouble
         assert symbols.size == data.size
@@ -206,7 +206,7 @@ class TestModulator16QAM:
         assert offsets[3] == 2
 
     def test_mapping(self):
-        data = ints_to_bits(np.arange(16))
+        data = ints_to_bits(np.arange(16), 4)
         symbols = self.modulator(data)
 
         # Check dtype.

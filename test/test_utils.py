@@ -195,11 +195,14 @@ class TestEnergy:
 
 def test_ints_to_bits():
     # Test that bits are returned in the correct order (MSB first).
-    assert np.all(ints_to_bits(np.asarray((6,))) == [True, True, False])
+    assert np.all(ints_to_bits(np.asarray((6,)), 3) == [True, True, False])
 
-    # Test automatic width detection
-    assert np.all(ints_to_bits(np.asarray((2, 1))) == [True, False, False, True])
-    assert np.all(ints_to_bits(np.asarray((0, 1))) == [False, True])
+    # Test different numbers of bits per int.
+    assert np.all(
+        ints_to_bits(np.asarray((2, 1)), 3) == [False, True, False, False, False, True]
+    )
+    assert np.all(ints_to_bits(np.asarray((2, 1)), 2) == [True, False, False, True])
+    assert np.all(ints_to_bits(np.asarray((2, 1)), 1) == [False, True])
 
 
 def test_bits_to_ints():

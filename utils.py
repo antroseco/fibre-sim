@@ -295,19 +295,15 @@ def row_size(array: NDArray) -> int:
     return array.size if has_one_polarization(array) else array.size // 2
 
 
-def ints_to_bits(array: NDArray) -> NDArray[np.bool_]:
+def ints_to_bits(array: NDArray, bits_per_int: int) -> NDArray[np.bool_]:
     assert array.ndim == 1
-
-    # Determine how many bits are required to represent all values.
-    # The call to max() protects against cases where the greatest value is 0.
-    bit_count = floor(np.log2(max(array.max(), 1))) + 1
 
     # Place each element in its own row. The count argument in unpackbits()
     # doesn't do what we want it do otherwise.
     array = np.reshape(array, (array.size, 1)).astype(np.uint8)
 
     # Unpack each row individually.
-    array = np.unpackbits(array, axis=1, count=bit_count, bitorder="little")
+    array = np.unpackbits(array, axis=1, count=bits_per_int, bitorder="little")
 
     # bitorder="little" returns the LSB first, so we need to use fliplr() to
     # bring the MSB to the front.

@@ -132,7 +132,7 @@ class DemodulatorDQPSK(DemodulatorQPSK):
         decoded = np.diff(ints, prepend=np.uint8(0)) & 0b11
         assert decoded.dtype == np.uint8
 
-        return ints_to_bits(decoded)
+        return ints_to_bits(decoded, 2)
 
 
 class Modulator16QAM(Modulator):
