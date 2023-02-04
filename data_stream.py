@@ -32,7 +32,6 @@ class PseudoRandomStream(DataStream):
 
         self.last_chunk: Optional[NDArray[np.bool_]] = None
         self.rng = np.random.default_rng()
-        self.lag_cache: dict[int, int] = {}
 
     def generate(self, length: int) -> NDArray[np.bool_]:
         self.last_chunk = self.rng.integers(
