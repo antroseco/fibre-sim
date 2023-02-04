@@ -70,16 +70,22 @@ class ModulatorQPSK(Modulator):
         assert has_one_polarization(data)
 
         # Constellation has 4 symbols. Adjacent symbols only vary by 1 bit.
+        # XXX this is compatible with MATLAB's QPSK constellation:
+        # >> pskmod([0 1 2 3], 4) * exp(1j * pi/4)
+        #  0.7071 + 0.7071i
+        # -0.7071 + 0.7071i
+        #  0.7071 - 0.7071i
+        # -0.7071 - 0.7071i
         #
         #         Q
-        #   10    |    00
+        #   01    |    00
         #         |
         #  ---------------I
         #         |
-        #   11    |    01
+        #   11    |    10
         #         |
-        in_phase = 1 - 2 * data[0::2]
-        quadrature = 1j - 2j * data[1::2]
+        in_phase = 1 - 2 * data[1::2]
+        quadrature = 1j - 2j * data[0::2]
 
         # Normalize symbol energy.
         return (in_phase + quadrature) / np.sqrt(2)
@@ -94,10 +100,10 @@ class DemodulatorQPSK(Demodulator):
         super().__call__(symbols)
         assert has_one_polarization(symbols)
 
-        # In-phase component is the MSB.
-        msb = np.real(symbols) < 0
-        # Quadrature component is the LSB.
-        lsb = np.imag(symbols) < 0
+        # In-phase component is the LSB.
+        lsb = np.real(symbols) < 0
+        # Quadrature component is the MSB.
+        msb = np.imag(symbols) < 0
 
         data = np.empty(msb.size + lsb.size, dtype=np.bool_)
         data[0::2] = msb

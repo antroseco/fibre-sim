@@ -92,8 +92,8 @@ class TestModulatorQPSK:
 
         # Check constellation (diagram in the class definition).
         assert symbols[0] == 1 + 1j
-        assert symbols[1] == 1 - 1j
-        assert symbols[2] == -1 + 1j
+        assert symbols[1] == -1 + 1j
+        assert symbols[2] == 1 - 1j
         assert symbols[3] == -1 - 1j
 
     def test_odd_bit_lengths(self):
@@ -123,8 +123,8 @@ class TestDemodulatorQPSK:
         # Check that symbols have been demodulated correctly.
         ints = bits_to_ints(data, self.demodulator.bits_per_symbol)
         assert ints[0] == 0b00
-        assert ints[1] == 0b10
-        assert ints[2] == 0b01
+        assert ints[1] == 0b01
+        assert ints[2] == 0b10
         assert ints[3] == 0b11
 
     def test_combined(self):
