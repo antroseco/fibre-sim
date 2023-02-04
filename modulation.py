@@ -5,7 +5,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from laser import Laser
-from utils import Component, has_one_polarization, signal_power
+from utils import (
+    Component,
+    bits_to_ints,
+    has_one_polarization,
+    ints_to_bits,
+    signal_power,
+)
 
 
 class Modulator(Component):
@@ -98,6 +104,35 @@ class DemodulatorQPSK(Demodulator):
         data[1::2] = lsb
 
         return data
+
+
+class DemodulatorDQPSK(DemodulatorQPSK):
+    @staticmethod
+    def gray_to_binary(array: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        return (array ^ (array >> 1)).astype(np.uint8, copy=False)
+
+    def __call__(
+        self, symbols: NDArray[np.cdouble], scale: Optional[float] = None
+    ) -> NDArray[np.bool_]:
+        assert has_one_polarization(symbols)
+
+        bits = super().__call__(symbols, scale)
+        assert bits.size % 2 == 0
+
+        # This is simpler if we convert each bit pair into an int and then take
+        # their difference. Because the constellation is Gray coded, we need to
+        # convert to normal binary first. Fortunately, that's straightforward.
+        gray = bits_to_ints(bits, 2)
+
+        ints = self.gray_to_binary(gray.astype(np.uint8, copy=False))
+
+        # Differential coding: data is stored in the phase difference between
+        # symbols. First symbol is assumed to be 0, to match MATLAB (but should
+        # be discarded).
+        decoded = np.diff(ints, prepend=np.uint8(0)) & 0b11
+        assert decoded.dtype == np.uint8
+
+        return ints_to_bits(decoded)
 
 
 class Modulator16QAM(Modulator):

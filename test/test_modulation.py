@@ -6,6 +6,7 @@ import pytest
 from modulation import (
     Demodulator16QAM,
     DemodulatorBPSK,
+    DemodulatorDQPSK,
     DemodulatorQPSK,
     Modulator16QAM,
     ModulatorBPSK,
@@ -141,6 +142,52 @@ class TestDemodulatorQPSK:
         noise_r = rng.uniform(-0.5, 0.5, size=SYM_LENGTH)
         noise_i = rng.uniform(-0.5, 0.5, size=SYM_LENGTH) * 1j
         assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)
+
+
+class TestDemodulatorDQPSK:
+    demodulator = DemodulatorDQPSK()
+
+    def test_gray_to_binary(self) -> None:
+        gray = np.asarray((0b00, 0b01, 0b11, 0b10), dtype=np.uint8)
+
+        binary = self.demodulator.gray_to_binary(gray)
+
+        assert binary.dtype == np.uint8
+        assert binary.size == gray.size
+        assert np.all(binary == np.arange(4))
+
+    def test_demodulator(self) -> None:
+        # fmt: off
+        data = np.asarray(
+            (
+                2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 2, 2, 2, 3, 1, 3, 3, 3, 2, 1,
+                3, 3, 1, 2, 3, 2, 2, 1, 1, 2, 0
+            ),
+            dtype=np.uint8,
+        )
+        expected = np.asarray(
+            (
+                3, 1, 0, 0, 0, 3, 1, 0, 0, 0, 2, 1, 0, 0, 3, 3, 1, 0, 0, 1, 2,
+                1, 0, 3, 2, 3, 1, 0, 2, 0, 2, 1
+            ),
+            dtype=np.uint8,
+        )
+        # fmt: on
+
+        symbols = ModulatorQPSK()(ints_to_bits(data))
+
+        assert symbols.dtype == np.cdouble
+        assert symbols.size == data.size
+
+        decoded_bits = self.demodulator(symbols)
+
+        assert decoded_bits.dtype == np.bool_
+        assert decoded_bits.size == 2 * symbols.size
+
+        decoded = bits_to_ints(decoded_bits, 2)
+
+        assert decoded.size == expected.size
+        assert np.all(decoded == expected)
 
 
 class TestModulator16QAM:
