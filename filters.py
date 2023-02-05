@@ -12,6 +12,7 @@ from scipy.special import erf
 from utils import (
     Component,
     has_one_polarization,
+    has_two_polarizations,
     has_up_to_two_polarizations,
     normalize_power,
     overlap_save,
@@ -370,3 +371,95 @@ class AdaptiveEqualizer(Component):
                 self.w += self.mu * x * (r**2 - np.abs(y[i]) ** 2) * np.conj(y[i])
 
         return y
+
+
+class AdaptiveEqualizer2P(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    cma_to_rde_threshold = 256  # TODO find a good value.
+
+    def __init__(self, taps: int, mu: float) -> None:
+        super().__init__()
+
+        assert taps > 0
+        self.taps = taps
+
+        # FIXME 10**-2 is big, try 10**-4 to 10**-3
+        # Try correcting for chromatic dispersion (mismatch)
+        assert mu > 0
+        self.mu = mu
+
+        # Filter coefficients.
+        self.w1V = np.zeros(self.taps, dtype=np.cdouble)
+        self.w1H = np.zeros(self.taps, dtype=np.cdouble)
+        self.w2V = np.zeros(self.taps, dtype=np.cdouble)
+        self.w2H = np.zeros(self.taps, dtype=np.cdouble)
+
+        # Single spike initialization.
+        self.lag = floor(self.taps / 2) + 1
+        self.w1V[self.lag - 1] = 1
+
+    def __call__(
+        self, symbols: NDArray[np.cdouble]
+    ) -> tuple[NDArray[np.cdouble], NDArray[np.cdouble]]:
+        assert has_two_polarizations(symbols)
+
+        normalized = normalize_power(symbols)
+
+        # TODO train on the first e.g. 1000 symbols and then stop updating the
+        # filter.
+
+        R_cma = 1.32  # TODO explanation.
+        R_rde = np.asarray((1 / np.sqrt(5), 1, 3 / np.sqrt(5)))
+
+        # Wrap input array.
+        dataV = np.concatenate(
+            (
+                normalized[0, -self.lag + 1 :],
+                normalized[0, :],
+                normalized[0, : self.lag],
+            )
+        )
+        dataH = np.concatenate(
+            (
+                normalized[1, -self.lag + 1 :],
+                normalized[1, :],
+                normalized[1, : self.lag],
+            )
+        )
+        assert dataV.size == row_size(normalized) + self.w1V.size
+        assert dataH.size == row_size(normalized) + self.w1V.size
+
+        # Output array. Downsample 2:1. TODO add parameter for this.
+        y1 = np.empty(ceil(row_size(normalized) / 2), dtype=np.cdouble)
+        y2 = np.empty(ceil(row_size(normalized) / 2), dtype=np.cdouble)
+
+        for i in range(y1.size):
+            xV = dataV[2 * i : 2 * i + self.w1V.size]
+            xH = dataH[2 * i : 2 * i + self.w1H.size]
+
+            y1[i] = self.w1V.conj() @ xV + self.w1H.conj() @ xH
+            y2[i] = self.w2V.conj() @ xV + self.w2H.conj() @ xH
+
+            if i < self.cma_to_rde_threshold:
+                # CMA update step.
+                self.w1V += self.mu * xV * (R_cma - np.abs(y1[i]) ** 2) * np.conj(y1[i])
+                self.w1H += self.mu * xH * (R_cma - np.abs(y1[i]) ** 2) * np.conj(y1[i])
+                self.w2V += self.mu * xV * (R_cma - np.abs(y2[i]) ** 2) * np.conj(y2[i])
+                self.w2H += self.mu * xH * (R_cma - np.abs(y2[i]) ** 2) * np.conj(y2[i])
+            else:
+                raise NotImplementedError()
+                # Get radius closest to the compensated symbol.
+                # r = R_rde[np.argmin(np.abs(R_rde - np.abs(y[i])))]
+
+                # RDE update step.
+                # self.w1V += self.mu * x * (r**2 - np.abs(y[i]) ** 2) * np.conj(y[i])
+
+            # TODO variable.
+            if i == 5_000:
+                # Reinitialize filter coefficients.
+                self.w2H = np.conj(self.w1V[::-1])
+                self.w2V = -np.conj(self.w1H[::-1])
+
+        return y1, y2
