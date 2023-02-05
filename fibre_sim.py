@@ -18,7 +18,7 @@ from filters import (
     Decimate,
     PulseFilter,
 )
-from laser import NoisyLaser
+from laser import ContinuousWaveLaser, NoisyLaser
 from modulation import (
     Demodulator,
     Demodulator16QAM,
@@ -601,10 +601,10 @@ def plot_dd_phase_recovery_buffer_size() -> None:
 
 
 def plot_step_size_comparison() -> None:
-    LENGTH = 2**14
+    LENGTH = 2**16
     TX_POWER_dBm = 20
 
-    hs = [50, 100, 250, 500, 1000, 2000]
+    hs = [10, 25, 50, 100, 250, 500, 1000, 2000, FIBRE_LENGTH]
 
     channel = SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS)
 
@@ -613,7 +613,7 @@ def plot_step_size_comparison() -> None:
         (
             Modulator16QAM(),
             PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-            IQModulator(NoisyLaser(TX_POWER_dBm, SYMBOL_RATE * CHANNEL_SPS)),
+            IQModulator(ContinuousWaveLaser(TX_POWER_dBm)),
             channel,
             NoisyOpticalFrontEnd(SYMBOL_RATE * CHANNEL_SPS),
             Decimate(CHANNEL_SPS // RECEIVER_SPS),
@@ -621,14 +621,7 @@ def plot_step_size_comparison() -> None:
                 FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS
             ),
             PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
-            DecisionDirected(
-                Modulator16QAM(),
-                Demodulator16QAM(),
-                DDPR_BUFFER_SIZE,
-                SYMBOL_RATE,
-                LASER_LINEWIDTH_ESTIMATE,
-                SNR_ESTIMATE,
-            ),
+            Demodulator16QAM(),
         ),
     )
 
@@ -637,14 +630,17 @@ def plot_step_size_comparison() -> None:
         channel.h = h
         bers.append(system(LENGTH) / LENGTH)
 
-    _, ax = plt.subplots()
+    fig, ax = plt.subplots()
 
     ax.plot(hs, bers, alpha=0.6, marker="o")
 
     ax.set_yscale("log")
     ax.set_ylabel("BER")
+    ax.set_xscale("log")
     ax.set_xlabel("Split-step Fourier step size [m]")
     ax.set_title(f"TX power = {TX_POWER_dBm} dBm, 16-QAM at {SYMBOL_RATE//10**9} GBd")
+
+    fig.tight_layout()
 
     plt.show()
 
@@ -668,6 +664,7 @@ def plot_adaptive_equalizer_comparison() -> None:
             CDCompensator(
                 FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, cdc_taps
             ),
+            # Adaptive Equalizer already downsamples 2 to 1.
             PulseFilter(RECEIVER_SPS, down=1 if adaptive else 2),
             DecisionDirected(
                 Modulator16QAM(),
