@@ -10,6 +10,7 @@ from utils import (
     energy_db_to_lin,
     has_one_polarization,
     normalize_energy,
+    overlap_save,
     signal_power,
 )
 
@@ -153,3 +154,83 @@ class DecisionDirected(PhaseRecovery):
 
         # Flatten demodulated bits.
         return np.ravel(decisions)
+
+
+class ViterbiViterbi(PhaseRecovery):
+    def __init__(
+        self,
+        modulator: Modulator,
+        demodulator: Demodulator,
+        horizon: int,
+        symbol_rate: float,
+        linewidth: float,
+        snr_dB: float,
+    ) -> None:
+        super().__init__(modulator, demodulator)
+
+        # Determines the number of past and future symbols to use.
+        assert horizon >= 1
+        self.horizon = horizon
+        self.block_length = 2 * horizon + 1
+
+        assert symbol_rate > 0
+        self.symbol_period = 1 / symbol_rate
+
+        assert linewidth > 0
+        self.linewidth = linewidth
+
+        assert snr_dB > 0
+        self.snr = energy_db_to_lin(snr_dB)
+
+        # Aids testing and debugging.
+        self.last_estimates: Optional[NDArray[np.float64]] = None
+
+        assert self.modulator.bits_per_symbol == self.demodulator.bits_per_symbol
+        self.bits_per_symbol = self.modulator.bits_per_symbol
+
+    def ml_filter(self, Es: float) -> NDArray[np.float64]:
+        M: int = 2**self.modulator.bits_per_symbol
+        N = self.horizon
+        L = self.block_length
+
+        # Phase noise variance.
+        phase_noise_var = 2 * np.pi * self.linewidth * self.symbol_period
+
+        # Additive noise variance.
+        additive_noise_var = Es / (2 * self.snr)
+
+        # Covariance matrix.
+        K = np.zeros((L, L))
+        K[:N, :N] = np.fromfunction(lambda x, y: N - np.maximum(x, y), (N, N))
+        K[-N:, -N:] = np.fromfunction(lambda x, y: 1 + np.minimum(x, y), (N, N))
+
+        I = np.eye(L)
+
+        C = (
+            Es**M * M**2 * phase_noise_var * K
+            + Es ** (M - 1) * M**2 * additive_noise_var * I
+        )
+
+        # Significantly faster way of solving for w_ml.
+        w_ml = np.linalg.solve(C.T, np.ones(L))
+
+        return w_ml
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+
+        # M-PSK modulation order.
+        M = 2**self.modulator.bits_per_symbol
+
+        w_ml = self.ml_filter(signal_power(symbols))
+
+        filtered = overlap_save(w_ml, symbols**M, full=True)[
+            self.horizon + 1 : -self.horizon + 1
+        ]
+        assert filtered.size == symbols.size
+        estimates = (1 / M) * (np.angle(filtered) - np.pi)
+
+        self.last_raw = estimates
+        self.last_estimates = np.unwrap(estimates, period=2 * np.pi / M)
+
+        return symbols * np.exp(-1j * self.last_estimates)
