@@ -6,14 +6,14 @@ from numpy.typing import NDArray
 
 from filters import AdaptiveEqualizer2P, CDCompensator, Decimate
 from modulation import DemodulatorDQPSK, DemodulatorQPSK, ModulatorQPSK
-from phase_recovery import ViterbiViterbi
+from phase_recovery import DecisionDirected, ViterbiViterbi
 from utils import ints_to_bits
 
 plt.rcParams.update({"font.size": 14})
 
 
 def demodulate(
-    data: NDArray[np.float64],
+    data: NDArray[np.float64], dd_phase_recovery: bool
 ) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
     assert data.shape[1] == 4
 
@@ -43,12 +43,17 @@ def demodulate(
     x_eq = x_eq[40_000:] * np.conj(rotation)
     y_eq = y_eq[40_000:] * rotation
 
-    # TODO Try decision directed demodulation
-    vv = ViterbiViterbi(ModulatorQPSK(), DemodulatorQPSK(), 64, 10e9, 400e3, 10)
-    demod = DemodulatorDQPSK()
+    # Phase recovery.
+    if dd_phase_recovery:
+        vv = DecisionDirected(ModulatorQPSK(), DemodulatorQPSK(), 64, 10e9, 400e3, 10)
+        x_vv = ModulatorQPSK()(vv(x_eq))
+        y_vv = ModulatorQPSK()(vv(y_eq))
+    else:
+        vv = ViterbiViterbi(ModulatorQPSK(), DemodulatorQPSK(), 64, 10e9, 400e3, 10)
+        x_vv = vv(x_eq)
+        y_vv = vv(y_eq)
 
-    x_vv = vv(x_eq)
-    y_vv = vv(y_eq)
+    demod = DemodulatorDQPSK()
 
     # We don't have sufficient information to decode the first symbol.
     return demod(x_vv)[2:], demod(y_vv)[2:]
@@ -86,7 +91,7 @@ def slog10(num: float) -> str:
     return f"{np.log10(num):.2f}" if num != 0 else "-inf "
 
 
-def process_file(data_path: str) -> tuple[float, float]:
+def process_file(data_path: str, dd_phase_recovery: bool) -> tuple[float, float]:
     # Rotate by 45 deg to correct the weird constellation.
     data_recv = scipy.io.loadmat(data_path)["data"] * np.exp(1j * np.pi / 4)
 
@@ -98,7 +103,7 @@ def process_file(data_path: str) -> tuple[float, float]:
 
     assert data_recv.shape == (1_000_000, 4)
 
-    x_demod, y_demod = demodulate(data_recv)
+    x_demod, y_demod = demodulate(data_recv, dd_phase_recovery)
     x_lag, x_ber = compare_streams(data_refd_demod, x_demod)
     y_lag, y_ber = compare_streams(data_refd_demod, y_demod)
     print(
@@ -116,15 +121,19 @@ def process_file(data_path: str) -> tuple[float, float]:
 
 def main() -> None:
     dbms = range(-50, -33)
-    results = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat"), dbms)
-    x_bers, y_bers = zip(*results)
+    results_vv = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", False), dbms)
+    results_dd = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", True), dbms)
+    x_bers_vv, y_bers_vv = zip(*results_vv)
+    x_bers_dd, y_bers_dd = zip(*results_dd)
 
     # TODO fit theoretical curve (2x BER of QPSK).
 
     fig, ax = plt.subplots()
 
-    ax.plot(dbms, x_bers, label="X polarization", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, y_bers, label="Y polarization", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, x_bers_vv, label="X pol. (VV)", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, y_bers_vv, label="Y pol. (VV)", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, x_bers_dd, label="X pol. (DD)", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, y_bers_dd, label="Y pol. (DD)", alpha=0.6, linewidth=2, marker="o")
     ax.set_yscale("log")
     ax.set_xlabel("Received Power [dBm]")
     ax.set_ylabel("BER")
