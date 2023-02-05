@@ -119,14 +119,13 @@ class DecisionDirected(PhaseRecovery):
 
         # Significantly faster way of solving for w_ml.
         w_ml = np.linalg.solve(C.T, np.ones(N))
-        w_ml /= np.max(w_ml)
 
         return w_ml
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.bool_]:
         assert has_one_polarization(symbols)
 
-        estimates = np.empty(symbols.size)
+        estimates = np.empty(symbols.size, dtype=np.float64)
         decisions = np.empty((symbols.size, self.bits_per_symbol), dtype=np.bool_)
 
         shift_register = np.ones(self.buffer_size, np.cdouble)
@@ -150,9 +149,7 @@ class DecisionDirected(PhaseRecovery):
             prediction_term = symbol * np.conj(decided)
             shift_register[0] = prediction_term / np.abs(prediction_term)
 
-        self.last_estimates = estimates
-
-        # TODO unwrap the phase
+        self.last_estimates = np.unwrap(estimates)
 
         # Flatten demodulated bits.
         return np.ravel(decisions)
