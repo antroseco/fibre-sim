@@ -506,8 +506,8 @@ class AdaptiveEqualizerAlamouti(Component):
 
         # Single-tap phase estimator.
         self.p = 1 + 0j
-        self.p1 = 1 + 0j
-        self.p2 = 1 + 0j
+        self.p_1 = 1 + 0j
+        self.p_2 = 1 + 0j
 
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
@@ -525,41 +525,49 @@ class AdaptiveEqualizerAlamouti(Component):
         normalized = normalize_power(symbols).reshape(-1, 2)
 
         # XXX odd comes first, as we use 0-based indexing.
-        u_o = normalized[0::2].ravel()
-        u_e = np.conj(normalized[1::2].ravel())
+        symbols_odd = normalized[0::2].ravel()
+        symbols_even = normalized[1::2].ravel()
 
         # Wrap input array.
-        data_o = np.concatenate(
+        extended_odd = np.concatenate(
             (
-                u_o[-self.lag + 1 :],
-                u_o,
-                u_o[: self.lag],
+                symbols_odd[-self.lag + 1 :],
+                symbols_odd,
+                symbols_odd[: self.lag],
             )
         )
-        data_e = np.concatenate(
+        extended_even = np.concatenate(
             (
-                u_e[-self.lag + 1 :],
-                u_e,
-                u_e[: self.lag],
+                symbols_even[-self.lag + 1 :],
+                symbols_even,
+                symbols_even[: self.lag],
             )
         )
-        assert data_o.size == row_size(u_o) + self.w11.size
-        assert data_e.size == row_size(u_e) + self.w22.size
+        assert extended_odd.size == row_size(symbols_odd) + self.w11.size
+        assert extended_even.size == row_size(symbols_even) + self.w22.size
 
-        assert data_o.size == data_e.size
+        assert extended_odd.size == extended_even.size
 
         # Output array.
         y = np.empty(normalized.size // 2, dtype=np.cdouble)
 
         for i in range(0, y.size, 2):
-            x_o = data_o[i : i + self.w11.size]
-            x_e = data_e[i : i + self.w22.size]
+            u_o = extended_odd[i : i + self.w11.size]
+            u_e = extended_even[i : i + self.w22.size]
 
-            pc = np.conj(self.p)
+            u_oC = np.conj(u_o)
+            u_eC = np.conj(u_e)
+            pC = np.conj(self.p)
+
+            # Filter outputs.
+            u_11 = self.w11.conj() @ u_o
+            u_12 = self.w12.conj() @ u_eC
+            u_21 = self.w21.conj() @ u_o
+            u_22 = self.w22.conj() @ u_eC
 
             # Estimate next two symbols.
-            v_o = (self.w11.conj() @ x_o) * self.p + (self.w12.conj() @ x_e) * pc
-            v_e = (self.w21.conj() @ x_o) * self.p + (self.w22.conj() @ x_e) * pc
+            v_o = u_11 * self.p + u_12 * pC
+            v_e = u_21 * self.p + u_22 * pC
 
             if i < self.training_symbols.size:
                 d_o, d_e = self.training_symbols[i : i + 2]
@@ -581,16 +589,18 @@ class AdaptiveEqualizerAlamouti(Component):
             self.p_log.append(self.p)
 
             # Update phase estimate.
-            self.p1 += self.mu_p * e_o * np.conj(self.w11.conj() @ x_o)
-            self.p2 += self.mu_p * e_o * np.conj(self.w12.conj() @ x_e)
-            self.p = 0.5 * (self.p1 + np.conj(self.p2))
+            self.p_1 += self.mu_p * e_o * np.conj(u_11)
+            self.p_2 += self.mu_p * e_o * np.conj(u_12)
+            self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
-            # Update filter coefficients. TODO this could be more efficient.
+            pC = np.conj(self.p)
             pabs = np.abs(self.p)
-            self.w11 += self.mu * pabs / self.p * e_o * np.conj(x_o)
-            self.w12 += self.mu * pabs / np.conj(self.p) * e_o * np.conj(x_e)
-            self.w21 += self.mu * pabs / self.p * e_e * np.conj(x_o)
-            self.w22 += self.mu * pabs / np.conj(self.p) * e_e * np.conj(x_e)
+
+            # Update filter coefficients.
+            self.w11 += self.mu * pabs / self.p * e_o * u_oC
+            self.w12 += self.mu * pabs / pC * e_o * u_e
+            self.w21 += self.mu * pabs / self.p * e_e * u_oC
+            self.w22 += self.mu * pabs / pC * e_e * u_e
 
             # FIXME eventually output decisions.
             y[i : i + 2] = v_o, v_e
