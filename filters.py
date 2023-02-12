@@ -9,6 +9,7 @@ from scipy.linalg import toeplitz
 from scipy.signal import decimate
 from scipy.special import erf
 
+from modulation import Demodulator, Modulator
 from utils import (
     Component,
     for_each_polarization,
@@ -464,4 +465,134 @@ class AdaptiveEqualizer2P(Component):
                 self.w2H = np.conj(self.w1V[::-1])
                 self.w2V = -np.conj(self.w1H[::-1])
 
+        # FIXME should vstack.
         return y1, y2
+
+
+class AdaptiveEqualizerAlamouti(Component):
+    input_type = "cd symbols"
+    output_type = "cd symbols"
+
+    def __init__(
+        self,
+        taps: int,
+        mu: float,
+        mu_p: float,
+        modulator: Modulator,
+        demodulator: Demodulator,
+        training_symbols: NDArray[np.cdouble],
+    ) -> None:
+        super().__init__()
+
+        assert taps > 0
+        self.taps = taps
+
+        assert mu > 0
+        self.mu = mu
+
+        assert mu_p > 0
+        self.mu_p = mu_p
+
+        self.modulator = modulator
+        self.demodulator = demodulator
+
+        self.training_symbols = training_symbols
+
+        # Filter coefficients.
+        self.w11 = np.zeros(self.taps, dtype=np.cdouble)
+        self.w12 = np.zeros(self.taps, dtype=np.cdouble)
+        self.w21 = np.zeros(self.taps, dtype=np.cdouble)
+        self.w22 = np.zeros(self.taps, dtype=np.cdouble)
+
+        # Single-tap phase estimator.
+        self.p = 1 + 0j
+        self.p1 = 1 + 0j
+        self.p2 = 1 + 0j
+
+        # Single spike initialization.
+        self.lag = floor(self.taps / 2) + 1
+        self.w11[self.lag - 1] = 1
+        self.w22[self.lag - 1] = -1
+
+        self.e_o_log = []
+        self.e_e_log = []
+        self.p_log = []
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+
+        # 1:2 Serial to Parallel conversion.
+        normalized = normalize_power(symbols).reshape(-1, 2)
+
+        # XXX odd comes first, as we use 0-based indexing.
+        u_o = normalized[0::2].ravel()
+        u_e = np.conj(normalized[1::2].ravel())
+
+        # Wrap input array.
+        data_o = np.concatenate(
+            (
+                u_o[-self.lag + 1 :],
+                u_o,
+                u_o[: self.lag],
+            )
+        )
+        data_e = np.concatenate(
+            (
+                u_e[-self.lag + 1 :],
+                u_e,
+                u_e[: self.lag],
+            )
+        )
+        assert data_o.size == row_size(u_o) + self.w11.size
+        assert data_e.size == row_size(u_e) + self.w22.size
+
+        assert data_o.size == data_e.size
+
+        # Output array.
+        y = np.empty(normalized.size // 2, dtype=np.cdouble)
+
+        for i in range(0, y.size, 2):
+            x_o = data_o[i : i + self.w11.size]
+            x_e = data_e[i : i + self.w22.size]
+
+            pc = np.conj(self.p)
+
+            # Estimate next two symbols.
+            v_o = (self.w11.conj() @ x_o) * self.p + (self.w12.conj() @ x_e) * pc
+            v_e = (self.w21.conj() @ x_o) * self.p + (self.w22.conj() @ x_e) * pc
+
+            if i < self.training_symbols.size:
+                d_o, d_e = self.training_symbols[i : i + 2]
+            else:
+                # Need to modulate the decided bits again to recover their symbol.
+                # FIXME verify scale = 1.
+                decisions = self.demodulator(np.asarray((v_o, v_e)), 1)
+                d_o, d_e = self.modulator(decisions)
+
+                if 100_000 < i < 100_010:
+                    print(f"{d_o=} {v_o=} {d_e=} {v_e=}")
+
+            # Compute errors.
+            e_o = d_o - v_o
+            e_e = d_e - v_e
+
+            self.e_o_log.append(e_o)
+            self.e_e_log.append(e_e)
+            self.p_log.append(self.p)
+
+            # Update phase estimate.
+            self.p1 += self.mu_p * e_o * np.conj(self.w11.conj() @ x_o)
+            self.p2 += self.mu_p * e_o * np.conj(self.w12.conj() @ x_e)
+            self.p = 0.5 * (self.p1 + np.conj(self.p2))
+
+            # Update filter coefficients. TODO this could be more efficient.
+            pabs = np.abs(self.p)
+            self.w11 += self.mu * pabs / self.p * e_o * np.conj(x_o)
+            self.w12 += self.mu * pabs / np.conj(self.p) * e_o * np.conj(x_e)
+            self.w21 += self.mu * pabs / self.p * e_e * np.conj(x_o)
+            self.w22 += self.mu * pabs / np.conj(self.p) * e_e * np.conj(x_e)
+
+            # FIXME eventually output decisions.
+            y[i : i + 2] = v_o, v_e
+
+        return y
