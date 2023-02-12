@@ -602,7 +602,7 @@ def plot_dd_phase_recovery_buffer_size() -> None:
 
 def plot_step_size_comparison() -> None:
     LENGTH = 2**16
-    TX_POWER_dBm = 20
+    TX_POWER_dBm = 17
 
     hs = [10, 25, 50, 100, 250, 500, 1000, 2000, FIBRE_LENGTH]
 
