@@ -122,3 +122,37 @@ class TestPolarizationRotation:
         assert np.isclose(signal_energy(rotated), signal_energy(test_data))
 
         assert np.allclose(rotated, np.asarray([[-3, -4, -5], [0, 1, 2]]))
+
+    @staticmethod
+    def test_common_rotation_2() -> None:
+        # 45 degree rotation.
+        rot = PolarizationRotation(np.pi / 4)
+
+        test_data = np.asarray((np.arange(4), np.arange(4)), dtype=np.cdouble)
+
+        rotated = rot(test_data)
+
+        assert rotated.shape == test_data.shape
+        assert rotated.dtype == test_data.dtype
+
+        assert np.isclose(signal_energy(rotated), signal_energy(test_data))
+
+        assert np.allclose(
+            rotated, np.asarray((np.zeros(4), np.sqrt(2 * np.arange(4) ** 2)))
+        )
+
+    @staticmethod
+    def test_no_rotation() -> None:
+        # 0 degree rotation.
+        rot = PolarizationRotation(0)
+
+        test_data = np.arange(6, dtype=np.cdouble).reshape(2, 3) + 2j
+
+        rotated = rot(test_data)
+
+        assert rotated.shape == test_data.shape
+        assert rotated.dtype == test_data.dtype
+
+        assert np.isclose(signal_energy(rotated), signal_energy(test_data))
+
+        assert np.allclose(rotated, test_data)
