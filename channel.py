@@ -162,3 +162,10 @@ class PolarizationRotation(Channel):
         assert has_two_polarizations(symbols)
 
         return self.matrix @ symbols
+
+
+class DropPolarization(Channel):
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_two_polarizations(symbols)
+
+        return symbols[0]

@@ -1,8 +1,14 @@
 import numpy as np
 import pytest
 
-from channel import AWGN, PolarizationRotation, Splitter
-from utils import energy_db_to_lin, signal_energy, signal_power
+from channel import AWGN, DropPolarization, PolarizationRotation, Splitter
+from utils import (
+    energy_db_to_lin,
+    has_one_polarization,
+    row_size,
+    signal_energy,
+    signal_power,
+)
 
 
 class TestAWGN:
@@ -156,3 +162,19 @@ class TestPolarizationRotation:
         assert np.isclose(signal_energy(rotated), signal_energy(test_data))
 
         assert np.allclose(rotated, test_data)
+
+
+class TestDropPolarization:
+    @staticmethod
+    def test_drop_polarization() -> None:
+        drop = DropPolarization()
+
+        test_data = np.arange(6, dtype=np.cdouble).reshape(2, 3) + 2j
+
+        first_polarization = drop(test_data)
+
+        assert has_one_polarization(first_polarization)
+        assert first_polarization.dtype == test_data.dtype
+        assert row_size(first_polarization) == row_size(test_data)
+
+        assert np.allclose(first_polarization, test_data[0])
