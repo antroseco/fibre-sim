@@ -3,12 +3,16 @@ from typing import Sequence
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 from scipy.signal import convolve, lfilter
 
 from utils import (
     bits_to_ints,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
+    for_each_polarization,
+    has_one_polarization,
+    has_two_polarizations,
     ints_to_bits,
     is_power_of_2,
     next_power_of_2,
@@ -224,3 +228,33 @@ def test_bits_to_ints():
     # bits can't be empty.
     with pytest.raises(Exception):
         bits_to_ints(np.asarray((), dtype=np.bool_), 2)
+
+
+class TestForEachPolarization:
+    @for_each_polarization
+    def double(self, array: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(array)
+
+        return array * 2
+
+    def test_one_polarization(self) -> None:
+        test_data = np.arange(4, dtype=np.cdouble) + 2j
+
+        doubled = self.double(test_data)
+
+        assert has_one_polarization(doubled)
+        assert doubled.size == test_data.size
+        assert doubled.dtype == test_data.dtype
+
+        assert np.allclose(doubled, test_data * 2)
+
+    def test_two_polarization(self) -> None:
+        test_data = np.arange(8, dtype=np.cdouble).reshape(2, 4) + 2j
+
+        doubled = self.double(test_data)
+
+        assert has_two_polarizations(doubled)
+        assert doubled.size == test_data.size
+        assert doubled.dtype == test_data.dtype
+
+        assert np.allclose(doubled, test_data * 2)

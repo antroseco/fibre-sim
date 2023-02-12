@@ -11,6 +11,7 @@ from scipy.special import erf
 
 from utils import (
     Component,
+    for_each_polarization,
     has_one_polarization,
     has_two_polarizations,
     has_up_to_two_polarizations,
@@ -87,6 +88,7 @@ class PulseFilter(Component):
         # Don't bother copying to a new array.
         return symbols[:: self.down]
 
+    @for_each_polarization
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)
 

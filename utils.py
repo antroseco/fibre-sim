@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from math import floor
-from typing import overload
+from typing import Any, Callable, overload
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -329,3 +328,21 @@ def bits_to_ints(bits: NDArray[np.bool_], bits_per_int: int) -> NDArray[np.uint8
     bits = np.fliplr(bits)
 
     return np.packbits(bits, axis=1, bitorder="little").ravel()
+
+
+def for_each_polarization(
+    fn: Callable[[Any, NDArray], NDArray]
+) -> Callable[[Any, NDArray], NDArray]:
+    def wrapper(self, array: NDArray) -> NDArray:
+        # Nothing to do here.
+        if has_one_polarization(array):
+            return fn(self, array)
+
+        assert has_up_to_two_polarizations(array)
+
+        pol_v = fn(self, array[0])
+        pol_h = fn(self, array[1])
+
+        return np.vstack((pol_v, pol_h))
+
+    return wrapper
