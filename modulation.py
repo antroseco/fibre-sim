@@ -9,7 +9,9 @@ from utils import (
     Component,
     bits_to_ints,
     has_one_polarization,
+    has_two_polarizations,
     ints_to_bits,
+    row_size,
     signal_power,
 )
 
@@ -281,12 +283,12 @@ class IQModulator(Component):
 
 class DPModulator(IQModulator):
     def __call__(self, voltages: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert has_one_polarization(voltages)
+        assert has_two_polarizations(voltages)
 
-        laser_output = self.laser(voltages.size)
+        laser_output = self.laser(row_size(voltages))
 
-        pol_v = 0.5 * self.iq_impl(voltages, laser_output)
-        pol_h = 0.5 * self.iq_impl(voltages, laser_output)
+        pol_v = 0.5 * self.iq_impl(voltages[0], laser_output)
+        pol_h = 0.5 * self.iq_impl(voltages[1], laser_output)
 
         return np.vstack((pol_v, pol_h))
 
