@@ -289,3 +289,19 @@ class DPModulator(IQModulator):
         pol_h = 0.5 * self.iq_impl(voltages, laser_output)
 
         return np.vstack((pol_v, pol_h))
+
+
+class AlamoutiEncoder(Component):
+    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(data)
+
+        pol_x = np.empty_like(data)
+        pol_y = np.empty_like(data)
+
+        pol_x[0::2] = data[0::2]
+        pol_x[1::2] = -np.conj(data[1::2])
+
+        pol_y[0::2] = data[1::2]
+        pol_y[1::2] = np.conj(data[0::2])
+
+        return np.vstack((pol_x, pol_y))

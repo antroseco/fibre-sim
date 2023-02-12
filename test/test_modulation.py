@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from modulation import (
+    AlamoutiEncoder,
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorDQPSK,
@@ -12,7 +13,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from utils import bits_to_ints, ints_to_bits
+from utils import bits_to_ints, has_two_polarizations, ints_to_bits, row_size
 
 
 class TestModulatorBPSK:
@@ -312,3 +313,24 @@ class TestDemodulator16QAM:
         noise_r = rng.uniform(-0.2, 0.2, size=SYM_LENGTH)
         noise_i = rng.uniform(-0.2, 0.2, size=SYM_LENGTH) * 1j
         assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)
+
+
+class TestAlamoutiEncoder:
+    encoder = AlamoutiEncoder()
+
+    def test_encoder(self) -> None:
+        data = np.arange(1, 5) + 1j * np.arange(1, 5)
+        expected_y = (data[1], np.conj(data[0]), data[3], np.conj(data[2]))
+        expected_x = (data[0], -np.conj(data[1]), data[2], -np.conj(data[3]))
+
+        encoded = self.encoder(data)
+
+        assert has_two_polarizations(encoded)
+        assert encoded.size == len(expected_y) + len(expected_x)
+        assert row_size(encoded) == len(expected_x) == len(expected_y)
+        assert encoded.dtype == data.dtype
+
+        encoded_x, encoded_y = encoded
+
+        assert np.allclose(encoded_x, expected_x)
+        assert np.allclose(encoded_y, expected_y)
