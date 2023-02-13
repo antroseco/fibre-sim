@@ -517,6 +517,12 @@ class AdaptiveEqualizerAlamouti(Component):
         self.e_o_log = []
         self.e_e_log = []
         self.p_log = []
+        self.w11_log = []
+        self.w12_log = []
+        self.w21_log = []
+        self.w22_log = []
+
+        self.first = True
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)
@@ -569,16 +575,13 @@ class AdaptiveEqualizerAlamouti(Component):
             v_o = u_11 * self.p + u_12 * pC
             v_e = u_21 * self.p + u_22 * pC
 
-            if i < self.training_symbols.size:
+            if self.first and i < self.training_symbols.size:
                 d_o, d_e = self.training_symbols[i : i + 2]
             else:
                 # Need to modulate the decided bits again to recover their symbol.
                 # FIXME verify scale = 1.
                 decisions = self.demodulator(np.asarray((v_o, v_e)), 1)
                 d_o, d_e = self.modulator(decisions)
-
-                if 100_000 < i < 100_010:
-                    print(f"{d_o=} {v_o=} {d_e=} {v_e=}")
 
             # Compute errors.
             e_o = d_o - v_o
@@ -602,7 +605,16 @@ class AdaptiveEqualizerAlamouti(Component):
             self.w21 += self.mu * pabs / self.p * e_e * u_oC
             self.w22 += self.mu * pabs / pC * e_e * u_e
 
+            self.w11_log.append(signal_energy(self.w11))
+            self.w21_log.append(signal_energy(self.w21))
+            self.w12_log.append(signal_energy(self.w12))
+            self.w22_log.append(signal_energy(self.w22))
+
             # FIXME eventually output decisions.
             y[i : i + 2] = v_o, v_e
+
+        if self.first:
+            self.mu *= 0.2
+            self.first = False
 
         return y
