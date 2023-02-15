@@ -367,8 +367,8 @@ def plot_rrc() -> None:
     SPS = 2
     EB_N0_dB = 10
     EB_N0 = energy_db_to_lin(EB_N0_dB)
-    SPANS = list(range(2, 17, 2))
-    BETA = 0.24
+    SPANS = list(range(2, 100, 4))
+    BETA = 0.021
     LENGTH = 2**21
 
     fig, axs = plt.subplots(nrows=2)
