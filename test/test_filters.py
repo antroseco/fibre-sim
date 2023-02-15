@@ -164,6 +164,22 @@ class TestPulseFilter:
         # Energy need not be preserved.
         assert np.allclose(normalize_energy(down), normalize_energy(data), atol=0.01)
 
+    @staticmethod
+    @pytest.mark.parametrize("target_size", (2**7, 2**8, 2**9))
+    def test_symbols_for_total_length(target_size: int) -> None:
+        SAMPLES_PER_SYMBOL = 4
+
+        pf = PulseFilter(SAMPLES_PER_SYMBOL, up=SAMPLES_PER_SYMBOL)
+        length = pf.symbols_for_total_length(target_size)
+
+        assert length > 0
+
+        data = np.ones(length)
+        up = pf(data)
+
+        assert up.ndim == 1
+        assert up.size == target_size * SAMPLES_PER_SYMBOL
+
 
 class TestChromaticDispersion:
     SAMPLES_PER_SYMBOL = 4

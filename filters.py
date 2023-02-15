@@ -112,6 +112,10 @@ class PulseFilter(Component):
         # Transmit the symbols as is.
         return filtered
 
+    @classmethod
+    def symbols_for_total_length(cls, total_length: int) -> int:
+        return total_length - cls.SPAN + 1
+
 
 def root_raised_cosine(
     beta: float, samples_per_symbol: int, span: int
