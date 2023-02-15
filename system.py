@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 from data_stream import DataStream
 from utils import Component
+from filters import PulseFilter
 
 # This is significantly faster than larger/smaller settings. The current
 # bottleneck is the circular convolution (using fft/ifft) which is sensitive to
@@ -20,6 +21,25 @@ def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -
         assert a.output_type == b.input_type
 
 
+def check_pulse_filters(components: Sequence[Component]) -> None:
+    count = 0
+    first_pf: Optional[PulseFilter] = None
+
+    for component in components:
+        if not isinstance(component, PulseFilter):
+            continue
+
+        if first_pf:
+            assert component.SPAN == first_pf.SPAN
+            assert component.BETA == first_pf.BETA
+        else:
+            first_pf = component
+
+        count += 1
+
+    assert count in (0, 2)
+
+
 def build_system(
     data_stream: DataStream,
     components: Sequence[Component],
@@ -27,6 +47,8 @@ def build_system(
 ) -> Callable[[int], int]:
     # FIXME need to update everything to work with the "cd electric field" type.
     # typecheck_system(data_stream, components)
+
+    check_pulse_filters(components)
 
     def reduce_fn(x: NDArray, component: Component) -> NDArray:
         y = component(x)
