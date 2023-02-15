@@ -110,7 +110,7 @@ class SSFChannel(Channel):
         # Equations are mostly the same for one and two polarizations. fft and
         # ifft can handle two rows just fine.
         assert has_up_to_two_polarizations(symbols)
-        # FIXME assert is_power_of_2(symbols.size)
+        assert is_power_of_2(row_size(symbols))
 
         remaining_length = self.length
 

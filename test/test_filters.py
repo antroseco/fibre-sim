@@ -23,7 +23,7 @@ def generate_random_data(length: int) -> NDArray[np.cdouble]:
 
 
 def generate_random_pulses(length: int, samples_per_symbol: int) -> NDArray[np.cdouble]:
-    data = generate_random_data(length)
+    data = generate_random_data(PulseFilter.symbols_for_total_length(length))
     return PulseFilter(samples_per_symbol, up=samples_per_symbol)(data)
 
 

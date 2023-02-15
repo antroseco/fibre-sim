@@ -16,6 +16,7 @@ from utils import (
     has_one_polarization,
     has_two_polarizations,
     has_up_to_two_polarizations,
+    is_power_of_2,
     normalize_power,
     overlap_save,
     row_size,
@@ -199,6 +200,7 @@ class ChromaticDispersion(CDBase):
         # fft and ifft work just fine with 2D arrays. They operate on the last
         # axis by default (axis=1, i.e. along each row).
         assert has_up_to_two_polarizations(symbols)
+        assert is_power_of_2(row_size(symbols))
 
         cd = self.cd_spectrum(row_size(symbols), self.sampling_interval, self.K)
 

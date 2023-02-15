@@ -13,7 +13,7 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from system import MAX_CHUNK_SIZE, build_system
+from system import MAX_CHUNK_SIZE, MIN_CHUNK_SIZE, build_system
 from utils import (
     Component,
     calculate_awgn_ber_with_bpsk,
@@ -78,30 +78,32 @@ class TestSystem:
         counter = Counter()
         data_stream = PseudoRandomStream()
 
-        # Test simple data passthrough.
-        system = build_system(data_stream, (counter,))
+        # Test simple data passthrough (modulation is required).
+        system = build_system(
+            data_stream, (ModulatorBPSK(), counter, DemodulatorBPSK())
+        )
 
-        bit_errors = system(2)
+        bit_errors = system(MIN_CHUNK_SIZE)
 
         # Check that no errors have been reported.
         assert bit_errors == 0
 
         # Check that all data has passed through the channel.
         assert counter.calls == 1
-        assert counter.count == 2
+        assert counter.count == MIN_CHUNK_SIZE
 
         counter.reset()
 
         # Test automatic fragmentation.
-        length = 2 * MAX_CHUNK_SIZE + 1
-        bit_errors = system(length)
+        bit_errors = system(2 * MAX_CHUNK_SIZE + MIN_CHUNK_SIZE - 1)
 
         # Check that no errors have been reported.
         assert bit_errors == 0
 
-        # Check that the data has been split in 3.
-        assert counter.calls == 3
-        assert counter.count == length
+        # Check that the data has been split in 3. Last block is too small and
+        # should be dropped automatically.
+        assert counter.calls == 2
+        assert counter.count == 2 * MAX_CHUNK_SIZE
 
 
 class TestIntegration:
@@ -109,7 +111,7 @@ class TestIntegration:
 
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_bpsk_over_awgn(self, eb_n0: float):
-        LENGTH = 10**6
+        LENGTH = 2**20
 
         config = (
             ModulatorBPSK(),
@@ -130,7 +132,7 @@ class TestIntegration:
 
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_qpsk_over_awgn(self, eb_n0: float):
-        LENGTH = 10**6
+        LENGTH = 2**20
 
         config = (
             ModulatorQPSK(),
@@ -152,7 +154,7 @@ class TestIntegration:
 
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     def test_16qam_over_awgn(self, eb_n0: float):
-        LENGTH = 10**6
+        LENGTH = 2**20
 
         config = (
             Modulator16QAM(),

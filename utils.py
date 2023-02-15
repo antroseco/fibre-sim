@@ -346,3 +346,7 @@ def for_each_polarization(
         return np.vstack((pol_v, pol_h))
 
     return wrapper
+
+
+def clamp(value: int, low: int, high: int) -> int:
+    return max(low, min(value, high))
