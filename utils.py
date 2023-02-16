@@ -350,3 +350,7 @@ def for_each_polarization(
 
 def clamp(value: int, low: int, high: int) -> int:
     return max(low, min(value, high))
+
+
+def first_polarization(symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+    return symbols if has_one_polarization(symbols) else symbols[0]
