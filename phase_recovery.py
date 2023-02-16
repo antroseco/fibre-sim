@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from modulation import Demodulator, Modulator
 from utils import (
     Component,
+    Signal,
     energy_db_to_lin,
     has_one_polarization,
     normalize_energy,
@@ -27,6 +28,14 @@ class BlindPhaseSearch(PhaseRecovery):
     B = 128  # Number of test rotations.
     N = 16  # Number of past and future symbols used.
     P = np.pi / 2  # For all M-QAM modulation schemes.
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)
@@ -101,6 +110,14 @@ class DecisionDirected(PhaseRecovery):
 
         assert self.modulator.bits_per_symbol == self.demodulator.bits_per_symbol
         self.bits_per_symbol = self.modulator.bits_per_symbol
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.BITS, np.bool_, None
 
     @cached_property
     def ml_filter(self) -> NDArray[np.float64]:
@@ -187,6 +204,14 @@ class ViterbiViterbi(PhaseRecovery):
 
         assert self.modulator.bits_per_symbol == self.demodulator.bits_per_symbol
         self.bits_per_symbol = self.modulator.bits_per_symbol
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     def ml_filter(self, Es: float) -> NDArray[np.float64]:
         M: int = 2**self.modulator.bits_per_symbol

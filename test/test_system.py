@@ -1,3 +1,5 @@
+from typing import Optional, Type
+
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -16,6 +18,7 @@ from modulation import (
 from system import MAX_CHUNK_SIZE, MIN_CHUNK_SIZE, build_system
 from utils import (
     Component,
+    Signal,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
     signal_energy,
@@ -23,16 +26,21 @@ from utils import (
 
 
 class Counter(Component):
-    input_type = "bits"
-    output_type = "bits"
-
     def __init__(self) -> None:
         super().__init__()
 
         self.calls = 0
         self.count = 0
 
-    def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.bool_]:
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         self.calls += 1
         self.count += data.size
 
@@ -44,14 +52,19 @@ class Counter(Component):
 
 
 class EnergySensor(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     def __init__(self) -> None:
         super().__init__()
 
         self.mean: float = 0
         self.count: int = 0
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # Symbol energy is defined as the expected value of |x_k|^2 for all

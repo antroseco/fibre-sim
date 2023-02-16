@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from laser import Laser
 from utils import (
     Component,
+    Signal,
     bits_to_ints,
     has_one_polarization,
     has_two_polarizations,
@@ -17,10 +18,15 @@ from utils import (
 
 
 class Modulator(Component):
-    input_type = "bits"
-    output_type = "cd symbols"
-
     bits_per_symbol: int = 0
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.BITS, np.bool_, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     @abstractmethod
     def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
@@ -29,10 +35,15 @@ class Modulator(Component):
 
 
 class Demodulator(Component):
-    input_type = "cd symbols"
-    output_type = "bits"
-
     bits_per_symbol: int = 0
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.BITS, np.bool_, None
 
     @abstractmethod
     def __call__(
@@ -242,13 +253,18 @@ class Demodulator16QAM(Demodulator):
 
 
 class IQModulator(Component):
-    input_type = "cd symbols"
-    output_type = "cd electric field"
-
     def __init__(self, laser: Laser) -> None:
         super().__init__()
 
         self.laser = laser
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
 
     @staticmethod
     def iq_impl(
@@ -294,6 +310,14 @@ class DPModulator(IQModulator):
 
 
 class AlamoutiEncoder(Component):
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
+
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
 

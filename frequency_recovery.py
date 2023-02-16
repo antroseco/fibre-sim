@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -6,6 +6,7 @@ from scipy import signal
 
 from utils import (
     Component,
+    Signal,
     first_polarization,
     has_one_polarization,
     has_up_to_two_polarizations,
@@ -21,6 +22,14 @@ class FrequencyRecovery(Component):
         self.sampling_interval = 1 / sampling_rate
 
         self.freq_estimate: Optional[float] = None
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
 
     def estimate(self, symbols: NDArray[np.cdouble]) -> None:
         assert has_one_polarization(symbols)

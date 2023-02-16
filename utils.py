@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, overload
+from enum import Enum
+from typing import Any, Callable, Optional, Type, overload
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -8,10 +9,30 @@ from scipy.constants import speed_of_light
 from scipy.special import erfc
 
 
-class Component(ABC):
-    input_type = None
-    output_type = None
+class Signal(Enum):
+    BITS = 1
+    SYMBOLS = 2
+    OPTICAL = 3
 
+
+class TypeChecked(ABC):
+    # Type-checking tuple contains:
+    # - Signal type
+    # - numpy dtype
+    # - Optional samples per symbol
+
+    @property
+    @abstractmethod
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        pass
+
+    @property
+    @abstractmethod
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        pass
+
+
+class Component(TypeChecked):
     def __init__(self) -> None:
         super().__init__()
 

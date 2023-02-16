@@ -1,6 +1,6 @@
 from functools import cache, cached_property
 from math import ceil, floor
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,6 +12,7 @@ from scipy.special import erf
 from modulation import Demodulator, Modulator
 from utils import (
     Component,
+    Signal,
     for_each_polarization,
     has_one_polarization,
     has_two_polarizations,
@@ -25,12 +26,11 @@ from utils import (
 
 
 class PulseFilter(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     # A span of 32 is quite long for high values of beta (approaching 1),
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
+    # FIXME needs to be odd to ensure that 2^n - SPAN - 1 is even. If it's odd,
+    # then we can't use Alamouti coding.
     SPAN: int = 70
     BETA: float = 0.021
 
@@ -49,6 +49,7 @@ class PulseFilter(Component):
         # bandwidth of the pulse; even though the negative frequencies contain
         # useful information (as the signal is complex) the Nyquist frequency is
         # the same.
+        # XXX samples per symbol when filtering is performed.
         assert samples_per_symbol > 1
         self.samples_per_symbol = samples_per_symbol
 
@@ -62,6 +63,24 @@ class PulseFilter(Component):
 
         self.up = up
         self.down = down
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        samples_per_symbol = self.samples_per_symbol
+
+        if self.up:
+            samples_per_symbol //= self.up
+
+        return Signal.SYMBOLS, np.cdouble, samples_per_symbol
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        samples_per_symbol = self.samples_per_symbol
+
+        if self.down:
+            samples_per_symbol //= self.down
+
+        return Signal.SYMBOLS, np.cdouble, samples_per_symbol
 
     @cached_property
     def impulse_response(self) -> NDArray[np.float64]:
@@ -157,9 +176,6 @@ def root_raised_cosine(
 
 
 class CDBase(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     def __init__(self, length: float, sampling_rate: float) -> None:
         super().__init__()
 
@@ -180,6 +196,14 @@ class CDBase(Component):
 
 
 class ChromaticDispersion(CDBase):
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
+
     @staticmethod
     @cache
     def cd_spectrum(
@@ -237,6 +261,14 @@ class CDCompensator(CDBase):
         assert 0 <= pulse_filter_beta <= 1
         self.beta = pulse_filter_beta
 
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, self.samples_per_symbol
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, self.samples_per_symbol
+
     @cached_property
     def D(self) -> NDArray[np.cdouble]:
         half_length = (self.fir_length - 1) // 2
@@ -292,14 +324,19 @@ class CDCompensator(CDBase):
 
 
 class Decimate(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     def __init__(self, factor: int) -> None:
         super().__init__()
 
         assert factor > 1
         self.factor = factor
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # decimate operates over the last axis by default, i.e. along each row.
@@ -323,9 +360,6 @@ class Decimate(Component):
 
 
 class AdaptiveEqualizer(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     cma_to_rde_threshold = 256  # TODO find a good value.
 
     def __init__(self, taps: int, mu: float) -> None:
@@ -343,6 +377,14 @@ class AdaptiveEqualizer(Component):
         self.w = np.zeros(self.taps, dtype=np.cdouble)
         self.lag = floor(self.taps / 2) + 1
         self.w[self.lag - 1] = 1
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 2
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)
@@ -383,9 +425,6 @@ class AdaptiveEqualizer(Component):
 
 
 class AdaptiveEqualizer2P(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     cma_to_rde_threshold = 256  # TODO find a good value.
 
     def __init__(self, taps: int, mu: float) -> None:
@@ -408,6 +447,14 @@ class AdaptiveEqualizer2P(Component):
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
         self.w1V[self.lag - 1] = 1
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 2
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     def __call__(
         self, symbols: NDArray[np.cdouble]
@@ -476,9 +523,6 @@ class AdaptiveEqualizer2P(Component):
 
 
 class AdaptiveEqualizerAlamouti(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
-
     def __init__(
         self,
         taps: int,
@@ -529,6 +573,14 @@ class AdaptiveEqualizerAlamouti(Component):
         self.w22_log = []
 
         self.first = True
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 2
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, 1
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)

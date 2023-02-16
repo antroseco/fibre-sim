@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Type
 
 from numpy.typing import NDArray
 
@@ -7,7 +7,15 @@ from data_stream import DataStream
 from filters import PulseFilter
 from modulation import Demodulator, Modulator
 from phase_recovery import DecisionDirected
-from utils import Component, clamp, is_power_of_2, next_power_of_2, row_size
+from utils import (
+    Component,
+    Signal,
+    TypeChecked,
+    clamp,
+    is_power_of_2,
+    next_power_of_2,
+    row_size,
+)
 
 # Very short sequences probably won't work very well.
 MIN_CHUNK_SIZE = 2**12  # 4,096
@@ -18,12 +26,35 @@ MIN_CHUNK_SIZE = 2**12  # 4,096
 MAX_CHUNK_SIZE = 2**16  # 65,536
 
 
-def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -> None:
-    assert data_stream.output_type == components[0].input_type
-    assert components[-1].output_type == data_stream.input_type
+def typecheck_impl(
+    left: tuple[Signal, Type, Optional[int]], right: tuple[Signal, Type, Optional[int]]
+) -> bool:
+    print(left, right)
+    l_sig, l_dtype, l_sps = left
+    r_sig, r_dtype, r_sps = right
 
-    for a, b in zip(components, components[1:]):
-        assert a.output_type == b.input_type
+    if l_sig != r_sig:
+        return False
+
+    if l_dtype != r_dtype:
+        return False
+
+    if l_sps is None or r_sps is None:
+        return True
+
+    return l_sps == r_sps
+
+
+def typecheck_pair(left: TypeChecked, right: TypeChecked) -> bool:
+    print(left, right)
+    return typecheck_impl(left.output_type, right.input_type)
+
+
+def typecheck_system(data_stream: DataStream, components: Sequence[Component]) -> None:
+    assert typecheck_pair(data_stream, components[0])
+    assert typecheck_pair(components[-1], data_stream)
+
+    assert all(map(typecheck_pair, components, components[1:]))
 
 
 def check_pulse_filters(components: Sequence[Component]) -> bool:
@@ -77,8 +108,7 @@ def build_system(
     components: Sequence[Component],
     inspector: Optional[Callable[[str, NDArray], None]] = None,
 ) -> Callable[[int], int]:
-    # FIXME need to update everything to work with the "cd electric field" type.
-    # typecheck_system(data_stream, components)
+    typecheck_system(data_stream, components)
 
     has_pf = check_pulse_filters(components)
     bits_per_symbol = check_modulation(components)

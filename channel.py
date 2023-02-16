@@ -1,11 +1,12 @@
 from functools import cache
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
 
 from utils import (
     Component,
+    Signal,
     energy_db_to_lin,
     has_one_polarization,
     has_two_polarizations,
@@ -18,8 +19,13 @@ from utils import (
 
 
 class Channel(Component):
-    input_type = "cd symbols"
-    output_type = "cd symbols"
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
 
 
 class AWGN(Channel):
@@ -33,6 +39,16 @@ class AWGN(Channel):
         self.samples_per_symbol = samples_per_symbol
 
         self.rng = np.random.default_rng()
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        # AWGN is applied at the receiver.
+        return Signal.SYMBOLS, np.cdouble, self.samples_per_symbol
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        # AWGN is applied at the receiver.
+        return Signal.SYMBOLS, np.cdouble, self.samples_per_symbol
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)

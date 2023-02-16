@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -6,6 +7,7 @@ from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
 
 from utils import (
     Component,
+    Signal,
     has_one_polarization,
     has_up_to_two_polarizations,
     power_dbm_to_lin,
@@ -15,11 +17,16 @@ from utils import (
 
 
 class OpticalFrontEnd(Component):
-    input_type = "cd electric field"
-    output_type = "cd symbols"
-
     lo_power = power_dbm_to_lin(10)  # 10 dBm is the max for Class 1 lasers.
     lo_amplitude = np.sqrt(2 * lo_power)  # Signal power to peak amplitude.
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.OPTICAL, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
 
     @cached_property
     def responsivity(self) -> float:

@@ -1,18 +1,25 @@
-from abc import ABC, abstractmethod
-from typing import Optional
+from abc import abstractmethod
+from typing import Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
 
+from utils import Signal, TypeChecked
 
-class DataStream(ABC):
-    input_type = "bits"
-    output_type = "bits"
 
+class DataStream(TypeChecked):
     def __init__(self) -> None:
         super().__init__()
 
         self.bit_errors: int = 0
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.BITS, np.bool_, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.BITS, np.bool_, None
 
     @abstractmethod
     def generate(self, length: int) -> NDArray[np.bool_]:
