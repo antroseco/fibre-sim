@@ -4,8 +4,8 @@ from typing import Optional, Type
 import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
-from laser import NoisyLaser
 
+from laser import NoisyLaser
 from utils import (
     Component,
     Signal,
