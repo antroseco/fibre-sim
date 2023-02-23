@@ -4,6 +4,7 @@ from typing import Optional, Type
 import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import Boltzmann, Planck, elementary_charge, speed_of_light
+from laser import NoisyLaser
 
 from utils import (
     Component,
@@ -51,9 +52,9 @@ class OpticalFrontEnd(Component):
 
 
 class HeterodyneFrontEnd(OpticalFrontEnd):
-    LINEWIDTH = 200e3
-
-    def __init__(self, if_ghz: float, sampling_rate: float) -> None:
+    def __init__(
+        self, if_ghz: float, sampling_rate: float, linewidth: float = 200e3
+    ) -> None:
         super().__init__()
 
         assert if_ghz > 0
@@ -62,29 +63,24 @@ class HeterodyneFrontEnd(OpticalFrontEnd):
         assert sampling_rate > 0
         self.sampling_interval = 1 / sampling_rate
 
-        self.rng = np.random.default_rng()
+        self.laser = NoisyLaser(0, sampling_rate, linewidth)
 
-        # Aids testing and debugging.
-        self.last_noise: Optional[NDArray[np.float64]] = None
+    @property
+    def last_noise(self) -> Optional[NDArray[np.float64]]:
+        return self.laser.last_noise
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(Efields)
 
         if_term = (self.if_omega * self.sampling_interval) * np.arange(Efields.size)
 
-        # TODO merge with NoisyLaser.
-        noise_step_var = 2 * np.pi * self.LINEWIDTH * self.sampling_interval
-        noise_steps = self.rng.normal(
-            loc=0, scale=np.sqrt(noise_step_var), size=Efields.size
-        )
-        self.last_noise = np.cumsum(noise_steps)
-
-        phase_noise_term = -self.last_noise
+        self.laser.sample_phase_noise(Efields.size)
+        assert self.last_noise is not None
 
         return super().__call__(
-            np.real(Efields * np.exp(1j * (if_term - phase_noise_term))).astype(
-                np.cdouble  # FIXME cast
-            )
+            np.real(Efields * np.exp(1j * (if_term - self.last_noise))).astype(
+                np.cdouble
+            )  # FIXME cast
         )
 
 

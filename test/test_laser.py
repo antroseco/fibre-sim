@@ -65,5 +65,5 @@ class TestNoisyLaser:
         assert np.isclose(np.mean(phase_changes), 0, atol=1e-3)
 
         # Check variance.
-        expected_var = 2 * np.pi * self.laser.LINEWIDTH * LENGTH / self.SAMPLING_RATE
+        expected_var = 2 * np.pi * self.laser.linewidth * LENGTH / self.SAMPLING_RATE
         assert np.isclose(np.var(phase_changes), expected_var, rtol=0.05)
