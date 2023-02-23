@@ -13,8 +13,6 @@ from utils import (
     power_dbm_to_lin,
 )
 
-# TODO noisy laser
-
 
 class OpticalFrontEnd(Component):
     lo_power = power_dbm_to_lin(10)  # 10 dBm is the max for Class 1 lasers.
@@ -50,6 +48,76 @@ class OpticalFrontEnd(Component):
         # to multiply by the responsivity to get the photocurrent.
         # TODO implement intradyne detection.
         return self.responsivity * self.lo_amplitude * Efields
+
+
+class HeterodyneFrontEnd(OpticalFrontEnd):
+    LINEWIDTH = 200e3
+
+    def __init__(self, if_ghz: float, sampling_rate: float) -> None:
+        super().__init__()
+
+        assert if_ghz > 0
+        self.if_omega = 2 * np.pi * if_ghz * 1e9
+
+        assert sampling_rate > 0
+        self.sampling_interval = 1 / sampling_rate
+
+        self.rng = np.random.default_rng()
+
+        # Aids testing and debugging.
+        self.last_noise: Optional[NDArray[np.float64]] = None
+
+    def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(Efields)
+
+        if_term = (self.if_omega * self.sampling_interval) * np.arange(Efields.size)
+
+        # TODO merge with NoisyLaser.
+        noise_step_var = 2 * np.pi * self.LINEWIDTH * self.sampling_interval
+        noise_steps = self.rng.normal(
+            loc=0, scale=np.sqrt(noise_step_var), size=Efields.size
+        )
+        self.last_noise = np.cumsum(noise_steps)
+
+        phase_noise_term = -self.last_noise
+
+        return super().__call__(
+            np.real(Efields * np.exp(1j * (if_term - phase_noise_term))).astype(
+                np.cdouble  # FIXME cast
+            )
+        )
+
+
+class Digital90degHybrid(Component):
+    def __init__(self, if_ghz: float, sampling_rate: float) -> None:
+        super().__init__()
+
+        assert if_ghz > 0
+        self.if_omega = 2 * np.pi * if_ghz * 1e9
+
+        assert sampling_rate > 0
+        self.sampling_interval = 1 / sampling_rate
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+
+        if_term = (-self.if_omega * self.sampling_interval) * np.arange(symbols.size)
+
+        # LO conjugate (FIXME minus sign?).
+        lo = np.exp(1j * if_term)
+
+        in_phase = np.real(symbols * lo)
+        quadrature = np.real(symbols * lo * np.exp(-0.5j * np.pi))
+
+        return in_phase + 1j * quadrature
 
 
 class NoisyOpticalFrontEnd(OpticalFrontEnd):
