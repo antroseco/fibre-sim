@@ -105,15 +105,13 @@ class Digital90degHybrid(Component):
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(symbols)
 
-        if_term = (-self.if_omega * self.sampling_interval) * np.arange(symbols.size)
+        # LO, but conjugated.
+        if_term = (self.if_omega * self.sampling_interval) * np.arange(symbols.size)
+        loC = np.exp(-1j * if_term)
 
-        # LO conjugate (FIXME minus sign?).
-        lo = np.exp(1j * if_term)
-
-        in_phase = np.real(symbols * lo)
-        quadrature = np.real(symbols * lo * np.exp(-0.5j * np.pi))
-
-        return in_phase + 1j * quadrature
+        # Conveniently, the in-phase component is the real part, and the
+        # quadrature component is the imaginary part.
+        return symbols * loC
 
 
 class NoisyOpticalFrontEnd(OpticalFrontEnd):
