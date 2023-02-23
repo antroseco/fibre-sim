@@ -78,7 +78,7 @@ class HeterodyneFrontEnd(OpticalFrontEnd):
         assert self.last_noise is not None
 
         return super().__call__(
-            np.real(Efields * np.exp(1j * (if_term - self.last_noise))).astype(
+            (2 * np.real(Efields * np.exp(1j * (if_term - self.last_noise)))).astype(
                 np.cdouble
             )  # FIXME cast
         )
