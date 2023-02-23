@@ -47,7 +47,6 @@ class OpticalFrontEnd(Component):
         # Assuming an ideal local oscillator with unit amplitude, and with
         # homodyne detection to maintain the baseband represtation, we just have
         # to multiply by the responsivity to get the photocurrent.
-        # TODO implement intradyne detection.
         return self.responsivity * self.lo_amplitude * Efields
 
 
@@ -66,10 +65,14 @@ class HeterodyneFrontEnd(OpticalFrontEnd):
         self.laser = NoisyLaser(0, sampling_rate, linewidth)
 
     @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.float64, None
+
+    @property
     def last_noise(self) -> Optional[NDArray[np.float64]]:
         return self.laser.last_noise
 
-    def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+    def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.float64]:
         assert has_one_polarization(Efields)
 
         if_term = (self.if_omega * self.sampling_interval) * np.arange(Efields.size)
@@ -77,10 +80,8 @@ class HeterodyneFrontEnd(OpticalFrontEnd):
         self.laser.sample_phase_noise(Efields.size)
         assert self.last_noise is not None
 
-        return super().__call__(
-            (2 * np.real(Efields * np.exp(1j * (if_term - self.last_noise)))).astype(
-                np.cdouble
-            )  # FIXME cast
+        return (2 * self.responsivity * self.lo_amplitude) * np.real(
+            Efields * np.exp(1j * (if_term - self.last_noise))
         )
 
 
