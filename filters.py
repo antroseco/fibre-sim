@@ -582,29 +582,43 @@ class AdaptiveEqualizerAlamouti(Component):
     def output_type(self) -> tuple[Signal, Type, Optional[int]]:
         return Signal.SYMBOLS, np.cdouble, 1
 
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+    @staticmethod
+    def serial_to_parallel(
+        symbols: NDArray[np.cdouble],
+    ) -> tuple[NDArray[np.cdouble], NDArray[np.cdouble]]:
         assert has_one_polarization(symbols)
+        assert symbols.size % 2 == 0
 
         # 1:2 Serial to Parallel conversion.
-        normalized = normalize_power(symbols).reshape(-1, 2)
+        normalized = symbols.reshape(-1, 2)
 
         # XXX odd comes first, as we use 0-based indexing.
-        symbols_odd = normalized[0::2].ravel()
-        symbols_even = normalized[1::2].ravel()
+        symbols_odd = normalized[:, 0].ravel()
+        symbols_even = normalized[:, 1].ravel()
 
-        # Wrap input array.
+        return symbols_odd, symbols_even
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(symbols)
+        assert symbols.size % 4 == 0
+
+        normalized = normalize_power(symbols)
+        symbols_odd, symbols_even = self.serial_to_parallel(normalized)
+
+        # Wrap input array. TODO see if we can implement this (here and
+        # elsewhere) using np.pad(mode="wrap").
         extended_odd = np.concatenate(
             (
-                symbols_odd[-self.lag + 1 :],
+                np.zeros(self.lag - 1, dtype=np.cdouble),
                 symbols_odd,
-                symbols_odd[: self.lag],
+                np.zeros(self.lag, dtype=np.cdouble),
             )
         )
         extended_even = np.concatenate(
             (
-                symbols_even[-self.lag + 1 :],
+                np.zeros(self.lag - 1, dtype=np.cdouble),
                 symbols_even,
-                symbols_even[: self.lag],
+                np.zeros(self.lag, dtype=np.cdouble),
             )
         )
         assert extended_odd.size == row_size(symbols_odd) + self.w11.size
@@ -613,9 +627,9 @@ class AdaptiveEqualizerAlamouti(Component):
         assert extended_odd.size == extended_even.size
 
         # Output array.
-        y = np.empty(normalized.size // 2, dtype=np.cdouble)
+        y = np.empty(normalized.size, dtype=np.cdouble)
 
-        for i in range(0, y.size, 2):
+        for i in range(symbols_odd.size):
             u_o = extended_odd[i : i + self.w11.size]
             u_e = extended_even[i : i + self.w22.size]
 
@@ -634,7 +648,7 @@ class AdaptiveEqualizerAlamouti(Component):
             v_e = u_21 * self.p + u_22 * pC
 
             if self.first and i < self.training_symbols.size:
-                d_o, d_e = self.training_symbols[i : i + 2]
+                d_o, d_e = self.training_symbols[2 * i : 2 * i + 2]
             else:
                 # Need to modulate the decided bits again to recover their symbol.
                 # FIXME verify scale = 1.
@@ -669,10 +683,10 @@ class AdaptiveEqualizerAlamouti(Component):
             self.w22_log.append(signal_energy(self.w22))
 
             # FIXME eventually output decisions.
-            y[i : i + 2] = v_o, v_e
+            y[2 * i : 2 * i + 2] = v_o, v_e
 
         if self.first:
-            self.mu *= 0.2
+            # self.mu *= 0.2
             self.first = False
 
         return y

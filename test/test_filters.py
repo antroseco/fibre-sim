@@ -3,7 +3,13 @@ import pytest
 from numpy.typing import NDArray
 
 from channel import SSFChannel
-from filters import CDCompensator, ChromaticDispersion, PulseFilter, root_raised_cosine
+from filters import (
+    AdaptiveEqualizerAlamouti,
+    CDCompensator,
+    ChromaticDispersion,
+    PulseFilter,
+    root_raised_cosine,
+)
 from utils import normalize_energy, signal_energy
 
 # TODO
@@ -254,3 +260,19 @@ class TestSSFChannel:
         # Energy should follow Beer's law.
         expected_energy = signal_energy(tx) * np.exp(-attenuation * self.FIBRE_LENGTH)
         assert np.isclose(expected_energy, signal_energy(rx))
+
+
+class TestAdaptiveEqualizerAlamouti:
+    @staticmethod
+    def test_serial_to_parallel() -> None:
+        symbols = np.arange(1, 9, dtype=np.cdouble)
+
+        assert symbols.size % 2 == 0
+
+        odd, even = AdaptiveEqualizerAlamouti.serial_to_parallel(symbols)
+
+        assert odd.dtype == even.dtype == symbols.dtype
+        assert odd.size == even.size == symbols.size // 2
+
+        assert np.all(odd.real % 2 == 1)
+        assert np.all(even.real % 2 == 0)
