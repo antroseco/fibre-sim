@@ -1,4 +1,7 @@
+from typing import Literal
+
 import numpy as np
+import pytest
 import scipy.signal
 from numpy.typing import NDArray
 
@@ -67,10 +70,11 @@ class TestFrequencyRecovery:
         # Large tolerance as phase recovery can handle the difference.
         assert np.isclose(fr.freq_estimate, 100e6, atol=20e6)
 
-    def test_correction(self) -> None:
+    @pytest.mark.parametrize("window_function", ("gaussian", "nuttall"))
+    def test_correction(self, window_function: Literal["gaussian", "nuttall"]) -> None:
         symbols = self.generate_symbols(PulseFilter.symbols_for_total_length(512))
 
-        fr = FrequencyRecovery(self.RECEIVER_SPS * self.SYMBOL_RATE)
+        fr = FrequencyRecovery(self.RECEIVER_SPS * self.SYMBOL_RATE, window_function)
         corrected = fr(symbols)
 
         assert corrected.size == symbols.size

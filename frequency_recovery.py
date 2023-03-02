@@ -1,5 +1,5 @@
 from functools import cache
-from typing import Optional, Type
+from typing import Literal, Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,13 +16,18 @@ from utils import (
 
 
 class FrequencyRecovery(Component):
-    def __init__(self, sampling_rate: float) -> None:
+    def __init__(
+        self,
+        sampling_rate: float,
+        window_function: Literal["gaussian", "nuttall"] = "nuttall",
+    ) -> None:
         super().__init__()
 
         assert sampling_rate > 0
         self.sampling_interval = 1 / sampling_rate
 
         self.freq_estimate: Optional[float] = None
+        self.window_function = window_function
 
     @property
     def input_type(self) -> tuple[Signal, Type, Optional[int]]:
@@ -40,6 +45,23 @@ class FrequencyRecovery(Component):
         # suggests r = 8 gives the best results (Table 2), where r = L/σ.
         return signal.get_window(("gaussian", length / 8), length)
 
+    @staticmethod
+    @cache
+    def nuttall_4t5(length: int) -> NDArray[np.float64]:
+        # Improving FFT Frequency Measurement Resolution by Parabolic and
+        # Gaussian Spectrum Interpolation (M. Gasior and J. L. Gonzalez, 2004)
+        # gives the coefficients (Table 1) for a Nuttall-like window, with 4
+        # terms and a continuous fifth derivate. This has the best performance
+        # (Table 2).
+        a0 = 10 / 32
+        a1 = 15 / 32
+        a2 = 6 / 32
+        a3 = 1 / 32
+
+        ns = 2 * np.pi * np.arange(length) / length
+
+        return a0 - a1 * np.cos(ns) + a2 * np.cos(2 * ns) - a3 * np.cos(3 * ns)
+
     def estimate(self, symbols: NDArray[np.cdouble]) -> None:
         assert has_one_polarization(symbols)
 
@@ -47,7 +69,13 @@ class FrequencyRecovery(Component):
         # oversampling by 2 and have low-pass-filtered the data.
         sample = symbols[:256:2]
 
-        window = self.gaussian_window(sample.size)
+        assert self.window_function in ["gaussian", "nuttall"]
+        window = (
+            self.gaussian_window(sample.size)
+            if self.window_function == "gaussian"
+            else self.nuttall_4t5(sample.size)
+        )
+
         spectrum = np.abs(np.fft.fftshift(np.fft.fft(sample**4 * window)))
 
         k = np.argmax(spectrum)
