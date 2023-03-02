@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Optional, Type
 
 import numpy as np
@@ -31,15 +32,39 @@ class FrequencyRecovery(Component):
     def output_type(self) -> tuple[Signal, Type, Optional[int]]:
         return Signal.SYMBOLS, np.cdouble, None
 
+    @staticmethod
+    @cache
+    def gaussian_window(length: int) -> NDArray[np.float64]:
+        # Improving FFT Frequency Measurement Resolution by Parabolic and
+        # Gaussian Spectrum Interpolation (M. Gasior and J. L. Gonzalez, 2004)
+        # suggests r = 8 gives the best results (Table 2), where r = L/σ.
+        return signal.get_window(("gaussian", length / 8), length)
+
     def estimate(self, symbols: NDArray[np.cdouble]) -> None:
         assert has_one_polarization(symbols)
 
-        window = signal.windows.hann(symbols.size, False)
+        # Downsample by 2. This is generally safe, as we are typically
+        # oversampling by 2 and have low-pass-filtered the data.
+        sample = symbols[:256:2]
 
-        spectrum = np.abs(np.fft.fft((symbols * window) ** 4))
-        freqs = np.fft.fftfreq(symbols.size, self.sampling_interval)
+        window = self.gaussian_window(sample.size)
+        spectrum = np.abs(np.fft.fftshift(np.fft.fft(sample**4 * window)))
 
-        self.freq_estimate = freqs[np.argmax(spectrum)] / 4
+        k = np.argmax(spectrum)
+        a = spectrum[k - 1]
+        b = spectrum[k]
+        c = spectrum[k + 1]
+
+        # Quadratic interpolation (no logs necessary!).
+        p = 0.5 * (a - c) / (a - 2 * b + c)
+        assert np.abs(p) <= 0.5
+
+        # We raised the symbols to the 4th power, which multiplied all
+        # frequencies by 4. We have also downsampled by a factor of 2, so we
+        # need to double the sampling interval.
+        self.freq_estimate = (k + p - sample.size // 2) / (
+            4 * sample.size * (2 * self.sampling_interval)
+        )
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_up_to_two_polarizations(symbols)

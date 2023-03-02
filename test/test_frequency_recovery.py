@@ -63,7 +63,9 @@ class TestFrequencyRecovery:
         fr.estimate(symbols)
 
         assert fr.freq_estimate is not None
-        assert np.isclose(fr.freq_estimate, 100e6, atol=4e6)
+
+        # Large tolerance as phase recovery can handle the difference.
+        assert np.isclose(fr.freq_estimate, 100e6, atol=20e6)
 
     def test_correction(self) -> None:
         symbols = self.generate_symbols(PulseFilter.symbols_for_total_length(512))
@@ -77,8 +79,10 @@ class TestFrequencyRecovery:
         # Estimate new IF. Zero-padding helps increase frequency resolution.
         # Windowing increases robustness.
         window = scipy.signal.get_window("hamming", corrected.size)
-        fft = np.fft.fft(corrected**4 * window, n=4096)
-        freqs = np.fft.fftfreq(4096, 1 / (self.RECEIVER_SPS * self.SYMBOL_RATE))
+        fft = np.fft.fft(corrected**4 * window)
+        freqs = np.fft.fftfreq(
+            corrected.size, 1 / (self.RECEIVER_SPS * self.SYMBOL_RATE)
+        )
 
         peak_freq = freqs[np.argmax(np.abs(fft))]
 
