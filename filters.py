@@ -605,26 +605,12 @@ class AdaptiveEqualizerAlamouti(Component):
         normalized = normalize_power(symbols)
         symbols_odd, symbols_even = self.serial_to_parallel(normalized)
 
-        # Wrap input array. TODO see if we can implement this (here and
-        # elsewhere) using np.pad(mode="wrap").
-        extended_odd = np.concatenate(
-            (
-                np.zeros(self.lag - 1, dtype=np.cdouble),
-                symbols_odd,
-                np.zeros(self.lag, dtype=np.cdouble),
-            )
-        )
-        extended_even = np.concatenate(
-            (
-                np.zeros(self.lag - 1, dtype=np.cdouble),
-                symbols_even,
-                np.zeros(self.lag, dtype=np.cdouble),
-            )
-        )
-        assert extended_odd.size == row_size(symbols_odd) + self.w11.size
-        assert extended_even.size == row_size(symbols_even) + self.w22.size
+        # Wrap input array.
+        extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag), mode="wrap")
+        extended_even = np.pad(symbols_even, (self.lag - 1, self.lag), mode="wrap")
 
-        assert extended_odd.size == extended_even.size
+        assert extended_odd.size == symbols_odd.size + self.w11.size
+        assert extended_even.size == symbols_even.size + self.w22.size
 
         # Output array.
         y = np.empty(normalized.size, dtype=np.cdouble)
