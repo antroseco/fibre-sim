@@ -67,6 +67,8 @@ class FrequencyRecovery(Component):
 
         # Downsample by 2. This is generally safe, as we are typically
         # oversampling by 2 and have low-pass-filtered the data.
+        # TODO see if we can reduce the sample size to 64 symbols.
+        # TODO see if we can downsample further.
         sample = symbols[:256:2]
 
         assert self.window_function in ["gaussian", "nuttall"]
