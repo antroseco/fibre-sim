@@ -602,6 +602,7 @@ class AdaptiveEqualizerAlamouti(Component):
         assert has_one_polarization(symbols)
         assert symbols.size % 4 == 0
 
+        # FIXME don't normalize.
         normalized = normalize_power(symbols)
         symbols_odd, symbols_even = self.serial_to_parallel(normalized)
 
@@ -619,7 +620,6 @@ class AdaptiveEqualizerAlamouti(Component):
             u_o = extended_odd[i : i + self.w11.size]
             u_e = extended_even[i : i + self.w22.size]
 
-            u_oC = np.conj(u_o)
             u_eC = np.conj(u_e)
             pC = np.conj(self.p)
 
@@ -654,14 +654,15 @@ class AdaptiveEqualizerAlamouti(Component):
             self.p_2 += self.mu_p * e_o * np.conj(u_12)
             self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
-            pC = np.conj(self.p)
-            pabs = np.abs(self.p)
+            p = self.p
+            pC = np.conj(p)
+            pabs = np.abs(p)
 
             # Update filter coefficients.
-            self.w11 += self.mu * pabs / self.p * e_o * u_oC
-            self.w12 += self.mu * pabs / pC * e_o * u_e
-            self.w21 += self.mu * pabs / self.p * e_e * u_oC
-            self.w22 += self.mu * pabs / pC * e_e * u_e
+            self.w11 += self.mu * pabs / p * np.conj(e_o) * u_o
+            self.w12 += self.mu * pabs / pC * np.conj(e_o) * u_eC
+            self.w21 += self.mu * pabs / p * np.conj(e_e) * u_o
+            self.w22 += self.mu * pabs / pC * np.conj(e_e) * u_eC
 
             self.w11_log.append(signal_energy(self.w11))
             self.w21_log.append(signal_energy(self.w21))
@@ -671,8 +672,8 @@ class AdaptiveEqualizerAlamouti(Component):
             # FIXME eventually output decisions.
             y[2 * i : 2 * i + 2] = v_o, v_e
 
-        if self.first:
-            # self.mu *= 0.2
-            self.first = False
+        # FIXME we should be able to use training symbols after the first block
+        # (e.g. if the block size is 64).
+        self.first = False
 
         return y
