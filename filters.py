@@ -621,7 +621,10 @@ class AdaptiveEqualizerAlamouti(Component):
             u_e = extended_even[i : i + self.w22.size]
 
             u_eC = np.conj(u_e)
-            pC = np.conj(self.p)
+
+            p = self.p
+            pC = np.conj(p)
+            pabs = np.abs(p)
 
             # Filter outputs.
             u_11 = self.w11.conj() @ u_o
@@ -647,16 +650,6 @@ class AdaptiveEqualizerAlamouti(Component):
 
             self.e_o_log.append(e_o)
             self.e_e_log.append(e_e)
-            self.p_log.append(self.p)
-
-            # Update phase estimate.
-            self.p_1 += self.mu_p * e_o * np.conj(u_11)
-            self.p_2 += self.mu_p * e_o * np.conj(u_12)
-            self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
-
-            p = self.p
-            pC = np.conj(p)
-            pabs = np.abs(p)
 
             # Update filter coefficients.
             self.w11 += self.mu * pabs / p * np.conj(e_o) * u_o
@@ -664,6 +657,12 @@ class AdaptiveEqualizerAlamouti(Component):
             self.w21 += self.mu * pabs / p * np.conj(e_e) * u_o
             self.w22 += self.mu * pabs / pC * np.conj(e_e) * u_eC
 
+            # Update phase estimate.
+            self.p_1 += self.mu_p * e_o * np.conj(u_11)
+            self.p_2 += self.mu_p * e_o * np.conj(u_12)
+            self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
+
+            self.p_log.append(self.p)
             self.w11_log.append(signal_energy(self.w11))
             self.w21_log.append(signal_energy(self.w21))
             self.w12_log.append(signal_energy(self.w12))
