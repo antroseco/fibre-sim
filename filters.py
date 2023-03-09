@@ -641,7 +641,7 @@ class AdaptiveEqualizerAlamouti(Component):
             v_o = u_11P + u_12P
             v_e = u_21P + u_22P
 
-            if self.first and i < self.training_symbols.size:
+            if self.first and (2 * i + 2) <= self.training_symbols.size:
                 d_o, d_e = self.training_symbols[2 * i : 2 * i + 2]
             else:
                 # Need to modulate the decided bits again to recover their symbol.
