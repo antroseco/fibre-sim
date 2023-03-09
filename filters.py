@@ -632,14 +632,9 @@ class AdaptiveEqualizerAlamouti(Component):
             u_21 = self.w21.conj() @ u_o
             u_22 = self.w22.conj() @ u_eC
 
-            u_11P = u_11 * p
-            u_12P = u_12 * pC
-            u_21P = u_21 * p
-            u_22P = u_22 * pC
-
             # Estimate next two symbols.
-            v_o = u_11P + u_12P
-            v_e = u_21P + u_22P
+            v_o = u_11 * p + u_12 * pC
+            v_e = u_21 * p + u_22 * pC
 
             if self.first and (2 * i + 2) <= self.training_symbols.size:
                 d_o, d_e = self.training_symbols[2 * i : 2 * i + 2]
