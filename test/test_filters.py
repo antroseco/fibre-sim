@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import scipy.io
 from numpy.typing import NDArray
 
 from channel import SSFChannel
@@ -116,6 +117,27 @@ class TestRootRaisedCosine:
         assert result.ndim == 1
         assert result.size == SAMPLES_PER_SYMBOL * SPAN
         assert np.allclose(result, EXPECTED, atol=0.0001)
+
+    @staticmethod
+    def test_very_low_beta() -> None:
+        BETA = 0.0101  # 0.01 actually.
+        SPAN = 508
+        SAMPLES_PER_SYMBOL = 2
+
+        # Test against the filter used in some of the experiments.
+        expected = normalize_energy(
+            scipy.io.loadmat("test/matlab_pf_0.01.mat")["fir"].ravel()
+        )
+
+        result = root_raised_cosine(BETA, SAMPLES_PER_SYMBOL, SPAN)
+
+        assert np.all(np.isfinite(result))
+        assert np.all(np.isreal(result))
+        assert result.ndim == 1
+        assert result.size == SAMPLES_PER_SYMBOL * SPAN
+        # Their filter has an odd length, but we can only generate even length
+        # filters, so drop their last sample.
+        assert np.allclose(result, expected[:-1], atol=1e-4)
 
     @staticmethod
     @pytest.mark.parametrize("beta", (-0.1, 0, 1, 1.1))
