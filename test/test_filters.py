@@ -30,107 +30,25 @@ def generate_random_pulses(length: int, samples_per_symbol: int) -> NDArray[np.c
 
 class TestRootRaisedCosine:
     @staticmethod
-    def test_low_beta():
-        BETA = 0.11
-        SPAN = 6
-        SAMPLES_PER_SYMBOL = 4
+    @pytest.mark.parametrize(
+        "parameters", ((0.01, 508, 2), (0.10, 600, 4), (0.99, 600, 4))
+    )
+    def test_against_matlab(parameters: tuple[float, int, int]) -> None:
+        beta, span, samples_per_symbol = parameters
 
-        # Test against MATLAB's rcosdesign().
-        EXPECTED = (
-            -0.0136,
-            0.0260,
-            0.0570,
-            0.0559,
-            0.0144,
-            -0.0509,
-            -0.1024,
-            -0.0985,
-            -0.0149,
-            0.1388,
-            0.3188,
-            0.4631,
-            0.5181,
-            0.4631,
-            0.3188,
-            0.1388,
-            -0.0149,
-            -0.0985,
-            -0.1024,
-            -0.0509,
-            0.0144,
-            0.0559,
-            0.0570,
-            0.0260,
-        )
-
-        result = root_raised_cosine(BETA, SAMPLES_PER_SYMBOL, SPAN)
-
-        assert np.all(np.isfinite(result))
-        assert result.ndim == 1
-        assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        assert np.allclose(result, EXPECTED, atol=1e-4)
-
-    @staticmethod
-    def test_high_beta():
-        BETA = 0.99
-        SPAN = 6
-        SAMPLES_PER_SYMBOL = 4
-
-        # Test against MATLAB's rcosdesign().
-        EXPECTED = (
-            -0.0045,
-            0.0004,
-            0.0064,
-            -0.0006,
-            -0.0103,
-            0.0006,
-            0.0182,
-            -0.0013,
-            -0.0432,
-            0.0013,
-            0.2141,
-            0.5000,
-            0.6353,
-            0.5000,
-            0.2141,
-            0.0013,
-            -0.0432,
-            -0.0013,
-            0.0182,
-            0.0006,
-            -0.0103,
-            -0.0006,
-            0.0064,
-            0.0004,
-        )
-
-        result = root_raised_cosine(BETA, SAMPLES_PER_SYMBOL, SPAN)
-
-        assert np.all(np.isfinite(result))
-        assert np.all(np.isreal(result))
-        assert result.ndim == 1
-        assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        assert np.allclose(result, EXPECTED, atol=1e-4)
-
-    @staticmethod
-    def test_very_low_beta() -> None:
-        BETA = 0.01
-        SPAN = 508
-        SAMPLES_PER_SYMBOL = 2
-
-        # Test against the filter used in some of the experiments. MATLAB
-        # generates completly symmetric filters with an odd number of samples,
-        # so drop the last one to make its size even.
+        # Test against MATLAB's rcosdesign(). MATLAB generates completly
+        # symmetric filters with an odd number of samples, so drop the last one
+        # to make its size even.
         expected = normalize_energy(
-            scipy.io.loadmat("test/matlab_pf_0.01.mat")["fir"].ravel()[:-1]
+            scipy.io.loadmat(f"test/matlab_pf_{beta:.2f}.mat")["fir"].ravel()[:-1]
         )
 
-        result = root_raised_cosine(BETA, SAMPLES_PER_SYMBOL, SPAN)
+        result = root_raised_cosine(beta, samples_per_symbol, span)
 
         assert np.all(np.isfinite(result))
         assert np.all(np.isreal(result))
         assert result.ndim == 1
-        assert result.size == SAMPLES_PER_SYMBOL * SPAN
+        assert result.size == samples_per_symbol * span
         assert np.allclose(result, expected)
 
     @staticmethod
