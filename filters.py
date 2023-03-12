@@ -546,6 +546,7 @@ class AdaptiveEqualizerAlamouti(Component):
         modulator: Modulator,
         demodulator: Demodulator,
         training_symbols: NDArray[np.cdouble],
+        instrument: bool = False,
     ) -> None:
         super().__init__()
 
@@ -579,13 +580,10 @@ class AdaptiveEqualizerAlamouti(Component):
         self.w11[self.lag - 1] = 1
         self.w22[self.lag - 1] = -1
 
-        self.e_o_log = []
-        self.e_e_log = []
-        self.p_log = []
-        self.w11_log = []
-        self.w12_log = []
-        self.w21_log = []
-        self.w22_log = []
+        self.instrument = instrument
+        self.p_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
+        self.e_o_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
+        self.e_e_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
 
         self.first = True
 
@@ -631,6 +629,11 @@ class AdaptiveEqualizerAlamouti(Component):
         # Output array.
         y = np.empty(normalized.size, dtype=np.cdouble)
 
+        if self.instrument:
+            self.p_log = np.empty_like(symbols_odd)
+            self.e_o_log = np.empty_like(symbols_odd)
+            self.e_e_log = np.empty_like(symbols_odd)
+
         for i in range(symbols_odd.size):
             u_o = extended_odd[i : i + self.w11.size]
             u_e = extended_even[i : i + self.w22.size]
@@ -663,9 +666,6 @@ class AdaptiveEqualizerAlamouti(Component):
             e_o = d_o - v_o
             e_e = d_e - v_e
 
-            self.e_o_log.append(e_o)
-            self.e_e_log.append(e_e)
-
             # Update filter coefficients.
             self.w11 += self.mu * p / pabs * u_o * np.conj(e_o)
             self.w12 += self.mu * pC / pabs * u_eC * np.conj(e_o)
@@ -677,11 +677,10 @@ class AdaptiveEqualizerAlamouti(Component):
             self.p_2 += self.mu_p * u_12 * np.conj(e_o)
             self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
-            self.p_log.append(self.p)
-            self.w11_log.append(signal_energy(self.w11))
-            self.w21_log.append(signal_energy(self.w21))
-            self.w12_log.append(signal_energy(self.w12))
-            self.w22_log.append(signal_energy(self.w22))
+            if self.instrument:
+                self.p_log[i] = self.p
+                self.e_o_log[i] = e_o
+                self.e_e_log[i] = e_e
 
             # FIXME eventually output decisions.
             y[2 * i : 2 * i + 2] = v_o, v_e
