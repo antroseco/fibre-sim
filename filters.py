@@ -582,8 +582,8 @@ class AdaptiveEqualizerAlamouti(Component):
 
         self.instrument = instrument
         self.p_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
-        self.e_o_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
-        self.e_e_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
+        self.e_oC_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
+        self.e_eC_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
 
         self.first = True
 
@@ -631,8 +631,8 @@ class AdaptiveEqualizerAlamouti(Component):
 
         if self.instrument:
             self.p_log = np.empty_like(symbols_odd)
-            self.e_o_log = np.empty_like(symbols_odd)
-            self.e_e_log = np.empty_like(symbols_odd)
+            self.e_oC_log = np.empty_like(symbols_odd)
+            self.e_eC_log = np.empty_like(symbols_odd)
 
         for i in range(symbols_odd.size):
             u_o = extended_odd[i : i + self.w11.size]
@@ -662,24 +662,24 @@ class AdaptiveEqualizerAlamouti(Component):
                 d_o, d_e = self.modulator(decisions)
 
             # Compute errors.
-            e_o = d_o - v_o
-            e_e = d_e - v_e
+            e_oC = np.conj(d_o - v_o)
+            e_eC = np.conj(d_e - v_e)
 
             # Update filter coefficients.
-            self.w11 += self.mu * pC * u_o * np.conj(e_o)
-            self.w12 += self.mu * p * u_eC * np.conj(e_o)
-            self.w21 += self.mu * pC * u_o * np.conj(e_e)
-            self.w22 += self.mu * p * u_eC * np.conj(e_e)
+            self.w11 += self.mu * pC * u_o * e_oC
+            self.w12 += self.mu * p * u_eC * e_oC
+            self.w21 += self.mu * pC * u_o * e_eC
+            self.w22 += self.mu * p * u_eC * e_eC
 
             # Update phase estimate.
-            self.p_1 += self.mu_p * u_11 * np.conj(e_o)
-            self.p_2 += self.mu_p * u_12 * np.conj(e_o)
+            self.p_1 += self.mu_p * u_11 * e_oC
+            self.p_2 += self.mu_p * u_12 * e_oC
             self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
             if self.instrument:
                 self.p_log[i] = self.p
-                self.e_o_log[i] = e_o
-                self.e_e_log[i] = e_e
+                self.e_oC_log[i] = e_oC
+                self.e_eC_log[i] = e_eC
 
             # FIXME eventually output decisions.
             y[2 * i : 2 * i + 2] = v_o, v_e
