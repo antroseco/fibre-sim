@@ -74,7 +74,7 @@ class TestRootRaisedCosine:
         assert np.all(np.isfinite(result))
         assert result.ndim == 1
         assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        assert np.allclose(result, EXPECTED, atol=0.0001)
+        assert np.allclose(result, EXPECTED, atol=1e-4)
 
     @staticmethod
     def test_high_beta():
@@ -116,7 +116,7 @@ class TestRootRaisedCosine:
         assert np.all(np.isreal(result))
         assert result.ndim == 1
         assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        assert np.allclose(result, EXPECTED, atol=0.0001)
+        assert np.allclose(result, EXPECTED, atol=1e-4)
 
     @staticmethod
     def test_very_low_beta() -> None:
@@ -124,9 +124,11 @@ class TestRootRaisedCosine:
         SPAN = 508
         SAMPLES_PER_SYMBOL = 2
 
-        # Test against the filter used in some of the experiments.
+        # Test against the filter used in some of the experiments. MATLAB
+        # generates completly symmetric filters with an odd number of samples,
+        # so drop the last one to make its size even.
         expected = normalize_energy(
-            scipy.io.loadmat("test/matlab_pf_0.01.mat")["fir"].ravel()
+            scipy.io.loadmat("test/matlab_pf_0.01.mat")["fir"].ravel()[:-1]
         )
 
         result = root_raised_cosine(BETA, SAMPLES_PER_SYMBOL, SPAN)
@@ -135,9 +137,7 @@ class TestRootRaisedCosine:
         assert np.all(np.isreal(result))
         assert result.ndim == 1
         assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        # Their filter has an odd length, but we can only generate even length
-        # filters, so drop their last sample.
-        assert np.allclose(result, expected[:-1], atol=1e-4)
+        assert np.allclose(result, expected, atol=1e-4)
 
     @staticmethod
     @pytest.mark.parametrize("beta", (-0.1, 0, 1, 1.1))
@@ -161,11 +161,15 @@ class TestRootRaisedCosine:
     @pytest.mark.parametrize("beta", (0.01, 0.22, 0.51, 0.78, 0.99))
     @pytest.mark.parametrize("samples_per_symbol", (2, 4, 16))
     @pytest.mark.parametrize("span", (2, 4, 16))
-    def test_energy(beta: float, samples_per_symbol: int, span: int):
+    def test_energy_and_peak(beta: float, samples_per_symbol: int, span: int):
         result = root_raised_cosine(beta, samples_per_symbol, span)
         assert np.all(np.isreal(result))
 
+        # Unit energy.
         assert np.isclose(signal_energy(result), 1, rtol=1e-3)
+
+        # Peak should be in the middle (t = 0).
+        assert np.argmax(result) == result.size // 2
 
 
 class TestPulseFilter:

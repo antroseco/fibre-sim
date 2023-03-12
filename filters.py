@@ -17,6 +17,8 @@ from utils import (
     has_one_polarization,
     has_two_polarizations,
     has_up_to_two_polarizations,
+    is_even,
+    is_odd,
     is_power_of_2,
     normalize_energy,
     normalize_power,
@@ -30,8 +32,8 @@ class PulseFilter(Component):
     # A span of 32 is quite long for high values of beta (approaching 1),
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
-    # FIXME needs to be odd to ensure that 2^n - SPAN - 1 is even. If it's odd,
-    # then we can't use Alamouti coding.
+    # FIXME span needs to be odd to ensure that 2^n - SPAN - 1 is even, as
+    # Alamouti coding operates over pairs of symbols.
     SPAN: int = 70
     BETA: float = 0.021
 
@@ -86,11 +88,8 @@ class PulseFilter(Component):
     @cached_property
     def impulse_response(self) -> NDArray[np.float64]:
         rrc = root_raised_cosine(self.BETA, self.samples_per_symbol, self.SPAN)
-        assert np.argmax(rrc) == rrc.size // 2
-        assert np.isclose(signal_energy(rrc), 1)
 
         # FIXME 2 samples per symbol but low pass filter to match the bandwidth.
-
         return rrc
 
     def upsample(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
@@ -143,15 +142,16 @@ def root_raised_cosine(
 ) -> NDArray[np.float64]:
     assert 0 < beta < 1
     assert samples_per_symbol > 0
-    assert span % 2 == 0
+    # We want the filter to span an equal number of symbols on the left and
+    # right side of the peak. Further, we want it to occupy an integer number of
+    # symbols on each side, so we drop the last sample.
+    assert is_even(span)
 
-    # Normalize by samples_per_symbol to get time in terms of t/T
-    # (T = samples_per_symbol)
-    t = np.linspace(-span // 2, span // 2, samples_per_symbol * span, endpoint=False)
-
-    assert t.size % 2 == 0
-    assert t.size == samples_per_symbol * span
-    assert t[samples_per_symbol * span // 2] == 0
+    # Normalize by samples_per_symbol to get time in terms of t/Ts
+    # (Ts = samples_per_symbol). Filter is symmetric so we only need to compute
+    # half of it.
+    t = np.linspace(-span // 2, 0, samples_per_symbol * span // 2 + 1)
+    assert t[-1] == 0
 
     cos_term = np.cos((1 + beta) * np.pi * t)
 
@@ -168,10 +168,15 @@ def root_raised_cosine(
     # FIXME have to compute the limits when |t/T| = 1/4β.
     assert np.all(np.isfinite(p))
 
+    # Generate the upper half of the filter. Don't copy the peak at zero and the
+    # last sample.
+    full = np.pad(p, (0, p.size - 2), "reflect")
+    assert is_even(full.size)
+
     # Normalize energy. The equation we use does result in a unit energy signal,
     # but only if the span is infinite. Since we truncate the filter, we need to
     # re-normalize the remaining terms.
-    return normalize_energy(p)
+    return normalize_energy(full)
 
 
 class CDBase(Component):
@@ -254,7 +259,7 @@ class CDCompensator(CDBase):
         # Filter length N_c is assumed to be odd. Since the bounds are from
         # -(N_c - 1)/2 to (N_c - 1)/2 then it should be at least 3.
         assert fir_length >= 3
-        assert fir_length % 2 == 1
+        assert is_odd(fir_length)
         self.fir_length = fir_length
 
         assert 0 <= pulse_filter_beta <= 1
