@@ -29,7 +29,6 @@ MAX_CHUNK_SIZE = 2**16  # 65,536
 def typecheck_impl(
     left: tuple[Signal, Type, Optional[int]], right: tuple[Signal, Type, Optional[int]]
 ) -> bool:
-    print(left, right)
     l_sig, l_dtype, l_sps = left
     r_sig, r_dtype, r_sps = right
 
@@ -46,7 +45,6 @@ def typecheck_impl(
 
 
 def typecheck_pair(left: TypeChecked, right: TypeChecked) -> bool:
-    print(left, right)
     return typecheck_impl(left.output_type, right.input_type)
 
 
