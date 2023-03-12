@@ -12,6 +12,7 @@ from utils import (
     has_one_polarization,
     has_two_polarizations,
     ints_to_bits,
+    is_even,
     row_size,
     signal_power,
 )
@@ -136,7 +137,7 @@ class DemodulatorDQPSK(DemodulatorQPSK):
         assert has_one_polarization(symbols)
 
         bits = super().__call__(symbols, scale)
-        assert bits.size % 2 == 0
+        assert is_even(bits.size)
 
         # This is simpler if we convert each bit pair into an int and then take
         # their difference. Because the constellation is Gray coded, we need to

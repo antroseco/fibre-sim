@@ -11,7 +11,7 @@ from filters import (
     PulseFilter,
     root_raised_cosine,
 )
-from utils import normalize_energy, signal_energy
+from utils import is_even, normalize_energy, signal_energy
 
 # TODO
 # test for unit energy
@@ -289,7 +289,7 @@ class TestAdaptiveEqualizerAlamouti:
     def test_serial_to_parallel() -> None:
         symbols = np.arange(1, 9, dtype=np.cdouble)
 
-        assert symbols.size % 2 == 0
+        assert is_even(symbols.size)
 
         odd, even = AdaptiveEqualizerAlamouti.serial_to_parallel(symbols)
 

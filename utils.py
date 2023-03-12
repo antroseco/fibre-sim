@@ -375,3 +375,11 @@ def clamp(value: int, low: int, high: int) -> int:
 
 def first_polarization(symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
     return symbols if has_one_polarization(symbols) else symbols[0]
+
+
+def is_even(number: int) -> bool:
+    return number != 0 and number % 2 == 0
+
+
+def is_odd(number: int) -> bool:
+    return number % 2 == 1
