@@ -24,7 +24,6 @@ from utils import (
     normalize_power,
     overlap_save,
     row_size,
-    signal_energy,
 )
 
 
@@ -559,6 +558,9 @@ class AdaptiveEqualizerAlamouti(Component):
         assert mu_p > 0
         self.mu_p = mu_p
 
+        # Normalized LMS constant.
+        self.a = 1e-2
+
         self.modulator = modulator
         self.demodulator = demodulator
 
@@ -638,6 +640,7 @@ class AdaptiveEqualizerAlamouti(Component):
             u_o = extended_odd[i : i + self.w11.size]
             u_e = extended_even[i : i + self.w22.size]
 
+            u_oC = np.conj(u_o)
             u_eC = np.conj(u_e)
 
             p = self.p
@@ -665,13 +668,16 @@ class AdaptiveEqualizerAlamouti(Component):
             e_oC = np.conj(d_o - v_o)
             e_eC = np.conj(d_e - v_e)
 
-            # Update filter coefficients.
-            self.w11 += self.mu * pC * u_o * e_oC
-            self.w12 += self.mu * p * u_eC * e_oC
-            self.w21 += self.mu * pC * u_o * e_eC
-            self.w22 += self.mu * p * u_eC * e_eC
+            # Update filter coefficients using the Normalized LMS algorithm.
+            normalizer_o = self.a + pC * p * (u_oC @ u_o)
+            normalizer_e = self.a + pC * p * (u_eC @ u_e)
 
-            # Update phase estimate.
+            self.w11 += self.mu * pC * u_o * e_oC / normalizer_o
+            self.w12 += self.mu * p * u_eC * e_oC / normalizer_e
+            self.w21 += self.mu * pC * u_o * e_eC / normalizer_o
+            self.w22 += self.mu * p * u_eC * e_eC / normalizer_e
+
+            # Update phase estimate using the LMS algorithm.
             self.p_1 += self.mu_p * u_11 * e_oC
             self.p_2 += self.mu_p * u_12 * e_oC
             self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
