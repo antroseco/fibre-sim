@@ -605,11 +605,11 @@ class AdaptiveEqualizerAlamouti(Component):
         assert symbols.size % 2 == 0
 
         # 1:2 Serial to Parallel conversion.
-        normalized = symbols.reshape(-1, 2)
+        grouped = symbols.reshape(-1, 2)
 
         # XXX odd comes first, as we use 0-based indexing.
-        symbols_odd = normalized[:, 0].ravel()
-        symbols_even = normalized[:, 1].ravel()
+        symbols_odd = grouped[:, 0].ravel()
+        symbols_even = grouped[:, 1].ravel()
 
         return symbols_odd, symbols_even
 
@@ -617,9 +617,7 @@ class AdaptiveEqualizerAlamouti(Component):
         assert has_one_polarization(symbols)
         assert symbols.size % 4 == 0
 
-        # FIXME don't normalize.
-        normalized = normalize_power(symbols)
-        symbols_odd, symbols_even = self.serial_to_parallel(normalized)
+        symbols_odd, symbols_even = self.serial_to_parallel(symbols)
 
         # Wrap input array.
         extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag), mode="wrap")
@@ -629,7 +627,7 @@ class AdaptiveEqualizerAlamouti(Component):
         assert extended_even.size == symbols_even.size + self.w22.size
 
         # Output array.
-        y = np.empty(normalized.size, dtype=np.cdouble)
+        y = np.empty(symbols.size, dtype=np.cdouble)
 
         if self.instrument:
             self.p_log = np.empty_like(symbols_odd)
