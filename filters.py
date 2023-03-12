@@ -18,6 +18,7 @@ from utils import (
     has_two_polarizations,
     has_up_to_two_polarizations,
     is_power_of_2,
+    normalize_energy,
     normalize_power,
     overlap_save,
     row_size,
@@ -170,9 +171,7 @@ def root_raised_cosine(
     # Normalize energy. The equation we use does result in a unit energy signal,
     # but only if the span is infinite. Since we truncate the filter, we need to
     # re-normalize the remaining terms.
-    p /= np.sqrt(signal_energy(p))
-
-    return p
+    return normalize_energy(p)
 
 
 class CDBase(Component):
