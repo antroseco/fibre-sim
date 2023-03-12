@@ -131,7 +131,7 @@ class TestRootRaisedCosine:
         assert np.all(np.isreal(result))
         assert result.ndim == 1
         assert result.size == SAMPLES_PER_SYMBOL * SPAN
-        assert np.allclose(result, expected, atol=1e-4)
+        assert np.allclose(result, expected)
 
     @staticmethod
     @pytest.mark.parametrize("beta", (-0.1, 0, 1, 1.1))
