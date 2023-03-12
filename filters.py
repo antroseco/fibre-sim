@@ -153,19 +153,30 @@ def root_raised_cosine(
     t = np.linspace(-span // 2, 0, samples_per_symbol * span // 2 + 1)
     assert t[-1] == 0
 
-    cos_term = np.cos((1 + beta) * np.pi * t)
+    # General formula: not well-defined for all possible values of t/Ts.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        sin_term = np.sin(np.pi * t * (1 - beta))
+        cos_term = np.cos(np.pi * t * (1 + beta))
 
-    # numpy implements the normalized sinc function, so we need to divide by π
-    # to obtain the unnormalized sinc(x) = sin(x)/x.
-    sinc_term = np.sinc((1 - beta) * t)
-    sinc_term *= (1 - beta) * np.pi / (4 * beta)
+        numerator = sin_term + 4 * beta * t * cos_term
 
-    denominator = 1 - (4 * beta * t) ** 2
+        denominator = samples_per_symbol * np.pi * t * (1 - (4 * beta * t) ** 2)
 
-    p = (cos_term + sinc_term) / denominator
-    p *= 4 * beta / (np.pi * np.sqrt(samples_per_symbol))
+        p = numerator / denominator
 
-    # FIXME have to compute the limits when |t/T| = 1/4β.
+    # Limit at t/Ts = 0.
+    p[-1] = (1 + beta * (4 / np.pi - 1)) / samples_per_symbol
+
+    # Limit at abs(t/Ts) = 1/4β.
+    p[t == -1 / (4 * beta)] = (
+        beta
+        / (samples_per_symbol * np.sqrt(2))
+        * (
+            (1 + 2 / np.pi) * np.sin(np.pi / (4 * beta))
+            + (1 - 2 / np.pi) * np.cos(np.pi / (4 * beta))
+        )
+    )
+
     assert np.all(np.isfinite(p))
 
     # Generate the upper half of the filter. Don't copy the peak at zero and the
@@ -173,9 +184,9 @@ def root_raised_cosine(
     full = np.pad(p, (0, p.size - 2), "reflect")
     assert is_even(full.size)
 
-    # Normalize energy. The equation we use does result in a unit energy signal,
-    # but only if the span is infinite. Since we truncate the filter, we need to
-    # re-normalize the remaining terms.
+    # Normalize energy. The taps generated have energy 0.5, but only if the span
+    # is infinite. Since we truncate the filter, we need to re-normalize the
+    # remaining terms.
     return normalize_energy(full)
 
 

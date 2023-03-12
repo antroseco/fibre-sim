@@ -13,12 +13,6 @@ from filters import (
 )
 from utils import is_even, normalize_energy, signal_energy
 
-# TODO
-# test for unit energy
-# test for pulse bandwidth
-# test for perfect recovery in the absence of noise
-# test against the spectrum/series given for the raised cosine
-
 
 def generate_random_data(length: int) -> NDArray[np.cdouble]:
     rng = np.random.default_rng()
@@ -120,7 +114,7 @@ class TestRootRaisedCosine:
 
     @staticmethod
     def test_very_low_beta() -> None:
-        BETA = 0.0101  # 0.01 actually.
+        BETA = 0.01
         SPAN = 508
         SAMPLES_PER_SYMBOL = 2
 
