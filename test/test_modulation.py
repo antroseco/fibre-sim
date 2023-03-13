@@ -2,6 +2,7 @@ from itertools import product
 
 import numpy as np
 import pytest
+import scipy.io
 
 from modulation import (
     AlamoutiEncoder,
@@ -334,3 +335,37 @@ class TestAlamoutiEncoder:
 
         assert np.allclose(encoded_x, expected_x)
         assert np.allclose(encoded_y, expected_y)
+
+    def test_against_lab_data(self) -> None:
+        data = scipy.io.loadmat("test/AC_data.mat")
+
+        # Original 16-QAM symbols.
+        s_qam = np.ravel(data["s_qam"])
+
+        # Odd and even symbols (1-indexed). Not very interesting.
+        so = np.ravel(data["so"])
+        se = np.ravel(data["se"])
+
+        assert s_qam.size == 2 * so.size
+        assert s_qam.size == 2 * se.size
+
+        odd = s_qam[0::2]
+        even = s_qam[1::2]
+
+        assert np.allclose(odd, so)
+        assert np.allclose(even, se)
+
+        # These signals are prefixed with 2048 QAM symbols for some reason.
+        # Following those, are the two Alamouti-coded signals (one for each
+        # polarization)...
+        sx2 = np.ravel(data["sx2"])[2048:]
+        sy2 = np.ravel(data["sy2"])[2048:]
+
+        assert sx2.size == s_qam.size
+        assert sy2.size == s_qam.size
+
+        # ...which we can test our encoder against.
+        px, py = self.encoder(s_qam)
+
+        assert np.allclose(px, sx2)
+        assert np.allclose(py, sy2)
