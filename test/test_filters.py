@@ -203,7 +203,7 @@ class TestSSFChannel:
 class TestAdaptiveEqualizerAlamouti:
     @staticmethod
     def test_serial_to_parallel() -> None:
-        symbols = np.arange(1, 9, dtype=np.cdouble)
+        symbols = np.arange(1, 17, dtype=np.cdouble)
 
         assert is_even(symbols.size)
 
@@ -212,5 +212,5 @@ class TestAdaptiveEqualizerAlamouti:
         assert odd.dtype == even.dtype == symbols.dtype
         assert odd.size == even.size == symbols.size // 2
 
-        assert np.all(odd.real % 2 == 1)
-        assert np.all(even.real % 2 == 0)
+        assert np.allclose(odd, [1, 2, 5, 6, 9, 10, 13, 14])
+        assert np.allclose(even, [3, 4, 7, 8, 11, 12, 15, 16])

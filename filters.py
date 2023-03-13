@@ -608,8 +608,8 @@ class AdaptiveEqualizerAlamouti(Component):
         grouped = symbols.reshape(-1, 2)
 
         # XXX odd comes first, as we use 0-based indexing.
-        symbols_odd = grouped[:, 0].ravel()
-        symbols_even = grouped[:, 1].ravel()
+        symbols_odd = grouped[0::2].ravel()
+        symbols_even = grouped[1::2].ravel()
 
         return symbols_odd, symbols_even
 
@@ -626,15 +626,16 @@ class AdaptiveEqualizerAlamouti(Component):
         assert extended_odd.size == symbols_odd.size + self.w11.size
         assert extended_even.size == symbols_even.size + self.w22.size
 
-        # Output array.
-        y = np.empty(symbols.size, dtype=np.cdouble)
+        # Output array. We output 2 symbols for every 4 samples.
+        y = np.empty(symbols.size // 2, dtype=np.cdouble)
 
         if self.instrument:
-            self.p_log = np.empty_like(symbols_odd)
-            self.e_oC_log = np.empty_like(symbols_odd)
-            self.e_eC_log = np.empty_like(symbols_odd)
+            # One iteration per 4 samples.
+            self.p_log = np.empty(symbols.size // 4, dtype=np.cdouble)
+            self.e_oC_log = np.empty_like(self.p_log)
+            self.e_eC_log = np.empty_like(self.p_log)
 
-        for i in range(symbols_odd.size):
+        for i in range(0, symbols_odd.size, 2):
             u_o = extended_odd[i : i + self.w11.size]
             u_e = extended_even[i : i + self.w22.size]
 
@@ -654,8 +655,8 @@ class AdaptiveEqualizerAlamouti(Component):
             v_o = u_11 * pC + u_12 * p
             v_e = u_21 * pC + u_22 * p
 
-            if self.first and (2 * i + 2) <= self.training_symbols.size:
-                d_o, d_e = self.training_symbols[2 * i : 2 * i + 2]
+            if self.first and i + 2 <= self.training_symbols.size:
+                d_o, d_e = self.training_symbols[i : i + 2]
             else:
                 # Need to modulate the decided bits again to recover their symbol.
                 # FIXME verify scale = 1.
@@ -681,12 +682,12 @@ class AdaptiveEqualizerAlamouti(Component):
             self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
             if self.instrument:
-                self.p_log[i] = self.p
-                self.e_oC_log[i] = e_oC
-                self.e_eC_log[i] = e_eC
+                self.p_log[i // 2] = self.p
+                self.e_oC_log[i // 2] = e_oC
+                self.e_eC_log[i // 2] = e_eC
 
             # FIXME eventually output decisions.
-            y[2 * i : 2 * i + 2] = v_o, v_e
+            y[i : i + 2] = v_o, v_e
 
         # FIXME we should be able to use training symbols after the first block
         # (e.g. if the block size is 64).
