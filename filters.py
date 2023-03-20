@@ -327,7 +327,9 @@ class CDCompensator(CDBase):
 
         # FIXME Paper uses ε = 1e-14, although there is some flexibility.
         # return np.linalg.solve(self.Q + np.eye(self.fir_length), self.D)
-        return np.conj(np.linalg.lstsq(self.Q, self.D, rcond=0.9)[0])
+        # return np.conj(np.linalg.lstsq(self.Q, self.D, rcond=0.9)[0])
+        # FIXME we get better results without Q.
+        return np.conj(self.D)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
