@@ -20,7 +20,7 @@ class TestFrequencyRecovery:
 
     def generate_symbols(self, length: int) -> NDArray[np.cdouble]:
         # Generate and modulate data.
-        data = np.random.randint(0, 1, length * ModulatorQPSK.bits_per_symbol, np.bool_)
+        data = np.random.randint(0, 2, length * ModulatorQPSK.bits_per_symbol, np.bool_)
         tx_mod = ModulatorQPSK()(data)
         tx_pf = PulseFilter(self.CHANNEL_SPS, up=self.CHANNEL_SPS)(tx_mod)
 
