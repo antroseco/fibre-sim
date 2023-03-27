@@ -89,7 +89,6 @@ class Digital90degHybrid(Component):
     def __init__(self, if_ghz: float, sampling_rate: float) -> None:
         super().__init__()
 
-        assert if_ghz > 0
         self.if_omega = 2 * np.pi * if_ghz * 1e9
 
         assert sampling_rate > 0
