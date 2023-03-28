@@ -575,9 +575,9 @@ class AdaptiveEqualizerAlamouti(Component):
         self.w22 = np.zeros(self.taps, dtype=np.cdouble)
 
         # Single-tap phase estimator.
-        self.p = 1 + 0j
-        self.p_1 = 1 + 0j
-        self.p_2 = 1 + 0j
+        self.p = 2 * np.exp(1j * np.pi / 4)
+        self.p_1 = 2 * np.exp(1j * np.pi / 4)
+        self.p_2 = 2 * np.exp(1j * np.pi / 4)
 
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
@@ -645,7 +645,6 @@ class AdaptiveEqualizerAlamouti(Component):
             # self.mu = 1e-1 * np.exp(-i / 80_000)
 
             u_o = extended_odd[i : i + self.w11.size][::-1]
-            # r22 has already been conjugated
             u_e = extended_even[i : i + self.w22.size][::-1]
             u_oC = np.conj(u_o)
             u_eC = np.conj(u_e)
@@ -671,24 +670,16 @@ class AdaptiveEqualizerAlamouti(Component):
             e_o = d_o - v_o
             e_e = d_e - v_e
 
-            # Update filter coefficients using the Normalized LMS algorithm.
-            # normalizer_o = self.a + pC * p * (u_oC @ u_o)
-            # normalizer_e = self.a + pC * p * (u_eC @ u_e)
-
-            # self.w11 += self.mu * pC * u_o * e_oC / normalizer_o
-            # self.w12 += self.mu * p * u_eC * e_oC / normalizer_e
-            # self.w21 += self.mu * pC * u_o * e_eC / normalizer_o
-            # self.w22 += self.mu * p * u_eC * e_eC / normalizer_e
-
+            # Update weights. TODO use updated phase noise estimate.
             # self.w11 += self.mu * pabs / p * e_o * u_oC
             # self.w12 += self.mu * pabs / pC * e_o * u_e
             # self.w21 += self.mu * pabs / p * e_e * u_oC
             # self.w22 += self.mu * pabs / pC * e_e * u_e
 
             # Update phase estimate using the LMS algorithm.
-            # self.p_1 += self.mu_p * np.conj(u_11) * e_o
-            # self.p_2 += self.mu_p * np.conj(u_12) * e_o
-            # self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
+            self.p_1 += self.mu_p * e_o * np.conj(u_11)
+            self.p_2 += self.mu_p * e_o * np.conj(u_12)
+            self.p = (self.p_1 + np.conj(self.p_2)) / 2
 
             if self.instrument:
                 self.p_log[i // 2] = self.p
