@@ -578,6 +578,8 @@ class AdaptiveEqualizerAlamouti(Component):
         self.p = 1  # np.exp(1j * np.pi / 4)
         self.p_1 = 1  # np.exp(1j * np.pi / 4)
         self.p_2 = 1  # np.exp(1j * np.pi / 4)
+        self.p_3 = 1
+        self.p_4 = 1
 
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
