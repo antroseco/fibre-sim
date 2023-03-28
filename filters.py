@@ -581,8 +581,15 @@ class AdaptiveEqualizerAlamouti(Component):
 
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
-        self.w11[self.lag - 1] = 1
-        self.w22[self.lag - 1] = -1
+        # self.w11[self.lag - 1] = 0.5
+        # self.w11[self.lag] = 0.5
+        # self.w22[self.lag - 1] = -0.5
+        # self.w22[self.lag] = -0.5
+
+        assert self.w11.size == self.taps
+        assert self.w21.size == self.taps
+        assert self.w12.size == self.taps
+        assert self.w22.size == self.taps
 
         self.instrument = instrument
         self.p_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
@@ -615,84 +622,84 @@ class AdaptiveEqualizerAlamouti(Component):
 
         return symbols_odd, symbols_even
 
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert has_one_polarization(symbols)
-        assert symbols.size % 4 == 0
+    def __call__(
+        self, r11: NDArray[np.cdouble], r22: NDArray[np.cdouble]
+    ) -> NDArray[np.cdouble]:
+        extended_odd = np.pad(r11, (self.lag - 1, self.lag))
+        extended_even = np.pad(r22, (self.lag - 1, self.lag))
 
-        symbols_odd, symbols_even = self.serial_to_parallel(symbols)
-
-        # Wrap input array.
-        extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag), mode="wrap")
-        extended_even = np.pad(symbols_even, (self.lag - 1, self.lag), mode="wrap")
-
-        assert extended_odd.size == symbols_odd.size + self.w11.size
-        assert extended_even.size == symbols_even.size + self.w22.size
+        assert extended_odd.size == r11.size + self.w11.size
+        assert extended_even.size == r22.size + self.w22.size
 
         # Output array. We output 2 symbols for every 4 samples.
-        y = np.empty(symbols.size // 2, dtype=np.cdouble)
+        y = np.empty(r11.size, dtype=np.cdouble)
 
+        # FIXME resets every iteration...
         if self.instrument:
             # One iteration per 4 samples.
-            self.p_log = np.empty(symbols.size // 4, dtype=np.cdouble)
+            self.p_log = np.empty(r11.size // 2, dtype=np.cdouble)
             self.e_oC_log = np.empty_like(self.p_log)
             self.e_eC_log = np.empty_like(self.p_log)
 
-        for i in range(0, symbols_odd.size, 2):
-            u_o = extended_odd[i : i + self.w11.size]
-            u_e = extended_even[i : i + self.w22.size]
+        for i in range(0, r11.size, 2):
+            # self.mu = 1e-1 * np.exp(-i / 80_000)
 
+            u_o = extended_odd[i : i + self.w11.size][::-1]
+            # r22 has already been conjugated
+            u_e = extended_even[i : i + self.w22.size][::-1]
             u_oC = np.conj(u_o)
             u_eC = np.conj(u_e)
 
             p = self.p
+            pabs = np.abs(self.p)
             pC = np.conj(p)
 
-            # Filter outputs.
-            u_11 = self.w11.conj() @ u_o
-            u_12 = self.w12.conj() @ u_eC
-            u_21 = self.w21.conj() @ u_o
-            u_22 = self.w22.conj() @ u_eC
+            # Filter outputs. XXX No conj().
+            u_11 = self.w11 @ u_o
+            u_12 = self.w12 @ u_eC
+            u_21 = self.w21 @ u_o
+            u_22 = self.w22 @ u_eC
 
             # Estimate next two symbols.
-            v_o = u_11 * pC + u_12 * p
-            v_e = u_21 * pC + u_22 * p
+            v_o = u_11 * p + u_12 * pC
+            v_e = u_21 * p + u_22 * pC
 
-            if self.first and i + 2 <= self.training_symbols.size:
-                d_o, d_e = self.training_symbols[i : i + 2]
-            else:
-                # Need to modulate the decided bits again to recover their symbol.
-                # FIXME verify scale = 1.
-                decisions = self.demodulator(np.asarray((v_o, v_e)), 1)
-                d_o, d_e = self.modulator(decisions)
+            assert self.first and i + 2 <= self.training_symbols.size
+            d_o, d_e = self.training_symbols[i : i + 2]
 
             # Compute errors.
-            e_oC = np.conj(d_o - v_o)
-            e_eC = np.conj(d_e - v_e)
+            e_o = d_o - v_o
+            e_e = d_e - v_e
 
             # Update filter coefficients using the Normalized LMS algorithm.
-            normalizer_o = self.a + pC * p * (u_oC @ u_o)
-            normalizer_e = self.a + pC * p * (u_eC @ u_e)
+            # normalizer_o = self.a + pC * p * (u_oC @ u_o)
+            # normalizer_e = self.a + pC * p * (u_eC @ u_e)
 
-            self.w11 += self.mu * pC * u_o * e_oC / normalizer_o
-            self.w12 += self.mu * p * u_eC * e_oC / normalizer_e
-            self.w21 += self.mu * pC * u_o * e_eC / normalizer_o
-            self.w22 += self.mu * p * u_eC * e_eC / normalizer_e
+            # self.w11 += self.mu * pC * u_o * e_oC / normalizer_o
+            # self.w12 += self.mu * p * u_eC * e_oC / normalizer_e
+            # self.w21 += self.mu * pC * u_o * e_eC / normalizer_o
+            # self.w22 += self.mu * p * u_eC * e_eC / normalizer_e
+
+            # self.w11 += self.mu * pabs / p * e_o * u_oC
+            # self.w12 += self.mu * pabs / pC * e_o * u_e
+            # self.w21 += self.mu * pabs / p * e_e * u_oC
+            # self.w22 += self.mu * pabs / pC * e_e * u_e
 
             # Update phase estimate using the LMS algorithm.
-            self.p_1 += self.mu_p * u_11 * e_oC
-            self.p_2 += self.mu_p * u_12 * e_oC
-            self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
+            # self.p_1 += self.mu_p * np.conj(u_11) * e_o
+            # self.p_2 += self.mu_p * np.conj(u_12) * e_o
+            # self.p = 0.5 * (self.p_1 + np.conj(self.p_2))
 
             if self.instrument:
                 self.p_log[i // 2] = self.p
-                self.e_oC_log[i // 2] = e_oC
-                self.e_eC_log[i // 2] = e_eC
+                self.e_oC_log[i // 2] = e_o
+                self.e_eC_log[i // 2] = e_e
 
             # FIXME eventually output decisions.
             y[i : i + 2] = v_o, v_e
 
         # FIXME we should be able to use training symbols after the first block
         # (e.g. if the block size is 64).
-        self.first = False
+        # self.first = False
 
         return y
