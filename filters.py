@@ -575,16 +575,16 @@ class AdaptiveEqualizerAlamouti(Component):
         self.w22 = np.zeros(self.taps, dtype=np.cdouble)
 
         # Single-tap phase estimator.
-        self.p = 2 * np.exp(1j * np.pi / 4)
-        self.p_1 = 2 * np.exp(1j * np.pi / 4)
-        self.p_2 = 2 * np.exp(1j * np.pi / 4)
+        self.p = 1  # np.exp(1j * np.pi / 4)
+        self.p_1 = 1  # np.exp(1j * np.pi / 4)
+        self.p_2 = 1  # np.exp(1j * np.pi / 4)
 
         # Single spike initialization.
         self.lag = floor(self.taps / 2) + 1
-        # self.w11[self.lag - 1] = 0.5
-        # self.w11[self.lag] = 0.5
-        # self.w22[self.lag - 1] = -0.5
-        # self.w22[self.lag] = -0.5
+        self.w11[self.lag - 1] = 0.5
+        self.w11[self.lag] = 0.5
+        self.w22[self.lag - 1] = -0.5
+        self.w22[self.lag] = -0.5
 
         assert self.w11.size == self.taps
         assert self.w21.size == self.taps
@@ -642,8 +642,6 @@ class AdaptiveEqualizerAlamouti(Component):
             self.e_eC_log = np.empty_like(self.p_log)
 
         for i in range(0, r11.size, 2):
-            # self.mu = 1e-1 * np.exp(-i / 80_000)
-
             u_o = extended_odd[i : i + self.w11.size][::-1]
             u_e = extended_even[i : i + self.w22.size][::-1]
             u_oC = np.conj(u_o)
@@ -670,16 +668,21 @@ class AdaptiveEqualizerAlamouti(Component):
             e_o = d_o - v_o
             e_e = d_e - v_e
 
-            # Update weights. TODO use updated phase noise estimate.
-            # self.w11 += self.mu * pabs / p * e_o * u_oC
-            # self.w12 += self.mu * pabs / pC * e_o * u_e
-            # self.w21 += self.mu * pabs / p * e_e * u_oC
-            # self.w22 += self.mu * pabs / pC * e_e * u_e
-
             # Update phase estimate using the LMS algorithm.
             self.p_1 += self.mu_p * e_o * np.conj(u_11)
             self.p_2 += self.mu_p * e_o * np.conj(u_12)
             self.p = (self.p_1 + np.conj(self.p_2)) / 2
+
+            # Use updated p to update the weights.
+            p = self.p
+            pabs = np.abs(self.p)
+            pC = np.conj(p)
+
+            # Update weights.
+            self.w11 += self.mu * pabs / p * e_o * u_oC
+            self.w12 += self.mu * pabs / pC * e_o * u_e
+            self.w21 += self.mu * pabs / p * e_e * u_oC
+            self.w22 += self.mu * pabs / pC * e_e * u_e
 
             if self.instrument:
                 self.p_log[i // 2] = self.p
