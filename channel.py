@@ -71,7 +71,7 @@ class AWGN(Channel):
 class SSFChannel(Channel):
     h = 1000  # m
 
-    def __init__(self, fibre_length: int, sampling_rate: int) -> None:
+    def __init__(self, fibre_length: int, sampling_rate: float) -> None:
         super().__init__()
 
         assert fibre_length > 0
