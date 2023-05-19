@@ -77,30 +77,3 @@ class TestFrequencyRecovery:
 
         # Large tolerance as phase recovery can handle the difference.
         assert np.isclose(np.mean(estimates), freq_offset_GHz * 1e9, atol=20e6)
-
-    # @pytest.mark.parametrize("window_function", ("gaussian", "nuttall"))
-    # def test_correction(self, window_function: Literal["gaussian", "nuttall"]) -> None:
-    #     symbols = self.generate_symbols(PulseFilter.symbols_for_total_length(512))
-
-    #     fr = FrequencyRecovery(self.RECEIVER_SPS * self.SYMBOL_RATE, window_function)
-    #     corrected = fr(symbols)
-
-    #     assert corrected.size == symbols.size
-    #     assert corrected.dtype == symbols.dtype
-
-    #     # Estimate new IF. Zero-padding helps increase frequency resolution.
-    #     # Windowing increases robustness.
-    #     window = scipy.signal.get_window("hamming", corrected.size)
-    #     fft = np.fft.fft(corrected**4 * window)
-    #     freqs = np.fft.fftfreq(
-    #         corrected.size, 1 / (self.RECEIVER_SPS * self.SYMBOL_RATE)
-    #     )
-
-    #     peak_freq = freqs[np.argmax(np.abs(fft))]
-
-    #     print(peak_freq)
-
-    #     fr.estimate(corrected)
-    #     print(fr.freq_estimate)
-
-    #     assert np.abs(peak_freq) <= 5e6
