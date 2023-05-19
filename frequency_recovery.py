@@ -76,13 +76,13 @@ class FrequencyRecoveryFFT(Component):
 
         # Frequency offset should be very similar for both polarizations, so
         # only estimate it using the first polarization.
-        symbols = first_polarization(symbols)
+        first_pol = first_polarization(symbols)
 
         # Resample quickly to 1 sample per symbol. This gives us 12.5 GHz of
         # range at 50 GSa/s, which is more than enough. Downsampling further
         # would result in aliasing (25 GHz of bandwidth), downsampling less
         # would increase the distance (in Hz) between adjacent FFT bins.
-        downsampled = symbols[:: self.samples_per_symbol]
+        downsampled = first_pol[:: self.samples_per_symbol]
 
         # Avoid edge effects if possible. Slightly crude but works.
         sample = (
