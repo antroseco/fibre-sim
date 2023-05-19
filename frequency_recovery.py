@@ -9,16 +9,16 @@ from utils import (
     Component,
     Signal,
     first_polarization,
-    has_one_polarization,
     has_up_to_two_polarizations,
-    row_size,
+    is_power_of_2,
 )
 
 
-class FrequencyRecovery(Component):
+class FrequencyRecoveryFFT(Component):
     def __init__(
         self,
         sampling_rate: float,
+        fft_size: int,
         window_function: Literal["gaussian", "nuttall"] = "nuttall",
     ) -> None:
         super().__init__()
@@ -26,8 +26,13 @@ class FrequencyRecovery(Component):
         assert sampling_rate > 0
         self.sampling_interval = 1 / sampling_rate
 
-        self.freq_estimate: Optional[float] = None
+        assert is_power_of_2(fft_size)
+        self.fft_size = fft_size
+
+        assert window_function in ("gaussian", "nuttall")
         self.window_function = window_function
+
+        self.freq_estimate: Optional[float] = None
 
     @property
     def input_type(self) -> tuple[Signal, Type, Optional[int]]:
@@ -62,13 +67,17 @@ class FrequencyRecovery(Component):
 
         return a0 - a1 * np.cos(ns) + a2 * np.cos(2 * ns) - a3 * np.cos(3 * ns)
 
-    def estimate(self, symbols: NDArray[np.cdouble], fft_size: int) -> None:
-        assert has_one_polarization(symbols)
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_up_to_two_polarizations(symbols)
+
+        # Frequency offset should be very similar for both polarizations, so
+        # only estimate it using the first polarization.
+        symbols = first_polarization(symbols)
 
         # FIXME
-        sample = symbols[1024 : 1024 + fft_size]
+        sample = symbols[1024 : 1024 + self.fft_size]
 
-        assert self.window_function in ["gaussian", "nuttall"]
+        assert self.window_function in ("gaussian", "nuttall")
         window = (
             self.gaussian_window(sample.size)
             if self.window_function == "gaussian"
@@ -92,19 +101,4 @@ class FrequencyRecovery(Component):
             4 * sample.size * self.sampling_interval
         )
 
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        assert has_up_to_two_polarizations(symbols)
-
-        if self.freq_estimate is None:
-            # Frequency offset should be very similar for both polarizations, so
-            # only estimate it using the first polarization.
-            self.estimate(first_polarization(symbols), 1024)
-
-        # Help out the type checker.
-        assert self.freq_estimate is not None
-
-        ks = np.arange(row_size(symbols))
-
-        return symbols * np.exp(
-            (-2j * np.pi * self.freq_estimate * self.sampling_interval) * ks
-        )
+        return symbols

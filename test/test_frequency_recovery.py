@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 from channel import Splitter, SSFChannel
 from filters import CDCompensator, PulseFilter
-from frequency_recovery import FrequencyRecovery
+from frequency_recovery import FrequencyRecoveryFFT
 from laser import NoisyLaser
 from modulation import IQModulator, Modulator16QAM
 from receiver import Digital90degHybrid, HeterodyneFrontEnd
@@ -62,15 +62,15 @@ class TestFrequencyRecovery:
     @staticmethod
     @pytest.mark.parametrize("freq_offset_GHz", np.linspace(-1.2, 1.2, 4))
     def test_estimate(freq_offset_GHz: float) -> None:
-        fr = FrequencyRecovery(SYMBOL_RATE, "gaussian")
-        estimates = []
+        # Use a long FFT to reduce the test's variability.
+        fr = FrequencyRecoveryFFT(SYMBOL_RATE, 1024, "gaussian")
 
         # Get an average---we are concerned about steady-state performance.
+        estimates = []
         for _ in range(8):
             symbols = generate_symbols(4096, freq_offset_GHz)
 
-            # Use a long FFT to reduce the test's variability.
-            fr.estimate(symbols[::RECEIVER_SPS], 1024)
+            fr(symbols[::RECEIVER_SPS])
 
             assert fr.freq_estimate is not None
             estimates.append(fr.freq_estimate)
