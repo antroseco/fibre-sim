@@ -58,7 +58,7 @@ def generate_symbols(length: int, f_offset_GHz: float) -> NDArray[np.cdouble]:
     return rx_cdc
 
 
-class TestFrequencyRecovery:
+class TestFrequencyRecoveryFFT:
     @staticmethod
     @pytest.mark.parametrize("freq_offset_GHz", np.linspace(-1.2, 1.2, 4))
     def test_estimate(freq_offset_GHz: float) -> None:
