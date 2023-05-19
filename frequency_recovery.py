@@ -62,14 +62,11 @@ class FrequencyRecovery(Component):
 
         return a0 - a1 * np.cos(ns) + a2 * np.cos(2 * ns) - a3 * np.cos(3 * ns)
 
-    def estimate(self, symbols: NDArray[np.cdouble]) -> None:
+    def estimate(self, symbols: NDArray[np.cdouble], fft_size: int) -> None:
         assert has_one_polarization(symbols)
 
-        # Downsample by 2. This is generally safe, as we are typically
-        # oversampling by 2 and have low-pass-filtered the data.
-        # TODO see if we can reduce the sample size to 64 symbols.
-        # TODO see if we can downsample further.
-        sample = symbols[:256:2]
+        # FIXME
+        sample = symbols[1024 : 1024 + fft_size]
 
         assert self.window_function in ["gaussian", "nuttall"]
         window = (
@@ -83,17 +80,16 @@ class FrequencyRecovery(Component):
         k = np.argmax(spectrum)
         a = spectrum[k - 1]
         b = spectrum[k]
-        c = spectrum[k + 1]
+        c = spectrum[k + 1] if k + 1 < spectrum.size else spectrum[k] * 0.9
 
         # Quadratic interpolation (no logs necessary!).
         p = 0.5 * (a - c) / (a - 2 * b + c)
         assert np.abs(p) <= 0.5
 
         # We raised the symbols to the 4th power, which multiplied all
-        # frequencies by 4. We have also downsampled by a factor of 2, so we
-        # need to double the sampling interval.
+        # frequencies by 4.
         self.freq_estimate = (k + p - sample.size // 2) / (
-            4 * sample.size * (2 * self.sampling_interval)
+            4 * sample.size * self.sampling_interval
         )
 
     def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
@@ -102,7 +98,7 @@ class FrequencyRecovery(Component):
         if self.freq_estimate is None:
             # Frequency offset should be very similar for both polarizations, so
             # only estimate it using the first polarization.
-            self.estimate(first_polarization(symbols))
+            self.estimate(first_polarization(symbols), 1024)
 
         # Help out the type checker.
         assert self.freq_estimate is not None
