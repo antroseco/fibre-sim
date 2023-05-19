@@ -17,14 +17,18 @@ from utils import (
 class FrequencyRecoveryFFT(Component):
     def __init__(
         self,
-        sampling_rate: float,
+        symbol_rate: float,
+        samples_per_symbol: int,
         fft_size: int,
         window_function: Literal["gaussian", "nuttall"] = "nuttall",
     ) -> None:
         super().__init__()
 
-        assert sampling_rate > 0
-        self.sampling_interval = 1 / sampling_rate
+        assert symbol_rate > 0
+        self.symbol_interval = 1 / symbol_rate
+
+        assert samples_per_symbol > 0
+        self.samples_per_symbol = samples_per_symbol
 
         assert is_power_of_2(fft_size)
         self.fft_size = fft_size
@@ -74,8 +78,18 @@ class FrequencyRecoveryFFT(Component):
         # only estimate it using the first polarization.
         symbols = first_polarization(symbols)
 
-        # FIXME
-        sample = symbols[1024 : 1024 + self.fft_size]
+        # Resample quickly to 1 sample per symbol. This gives us 12.5 GHz of
+        # range at 50 GSa/s, which is more than enough. Downsampling further
+        # would result in aliasing (25 GHz of bandwidth), downsampling less
+        # would increase the distance (in Hz) between adjacent FFT bins.
+        downsampled = symbols[:: self.samples_per_symbol]
+
+        # Avoid edge effects if possible. Slightly crude but works.
+        sample = (
+            downsampled[: self.fft_size]
+            if downsampled.size < 1024 + self.fft_size
+            else downsampled[1024 : 1024 + self.fft_size]
+        )
 
         assert self.window_function in ("gaussian", "nuttall")
         window = (
@@ -98,7 +112,7 @@ class FrequencyRecoveryFFT(Component):
         # We raised the symbols to the 4th power, which multiplied all
         # frequencies by 4.
         self.freq_estimate = (k + p - sample.size // 2) / (
-            4 * sample.size * self.sampling_interval
+            4 * sample.size * self.symbol_interval
         )
 
         return symbols

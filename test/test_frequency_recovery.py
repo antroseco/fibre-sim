@@ -63,14 +63,14 @@ class TestFrequencyRecovery:
     @pytest.mark.parametrize("freq_offset_GHz", np.linspace(-1.2, 1.2, 4))
     def test_estimate(freq_offset_GHz: float) -> None:
         # Use a long FFT to reduce the test's variability.
-        fr = FrequencyRecoveryFFT(SYMBOL_RATE, 1024, "gaussian")
+        fr = FrequencyRecoveryFFT(SYMBOL_RATE, RECEIVER_SPS, 1024, "gaussian")
 
         # Get an average---we are concerned about steady-state performance.
         estimates = []
         for _ in range(8):
             symbols = generate_symbols(4096, freq_offset_GHz)
 
-            fr(symbols[::RECEIVER_SPS])
+            fr(symbols)
 
             assert fr.freq_estimate is not None
             estimates.append(fr.freq_estimate)
