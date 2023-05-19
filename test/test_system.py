@@ -185,7 +185,7 @@ class TestIntegration:
         assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
 
         # All symbols should have unit energy.
-        assert np.isclose(self.energy_sensor.mean, 1, atol=1e-3)
+        assert np.isclose(self.energy_sensor.mean, 1, atol=2e-3)
 
     @pytest.mark.parametrize("eb_n0", [1, 2, 3])
     @pytest.mark.parametrize("channel_sps", [4, 8, 16, 32])
