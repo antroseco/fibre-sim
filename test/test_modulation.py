@@ -270,14 +270,11 @@ class TestModulator16QAM:
         # Test against MATLAB's qammod(x, 16, 'gray'). There is more than one
         # possible constellation, but it's nice to be compatible.
         expected = normalize_power(
-            scipy.io.loadmat(f"test/matlab_16qam_gray.mat")["symgray"].ravel()
+            scipy.io.loadmat("test/matlab_16qam_gray.mat")["symgray"].ravel()
         )
 
         data = ints_to_bits(np.arange(16), 4)
         result = self.modulator(data)
-
-        print(expected[:4])
-        print(result[:4])
 
         assert result.dtype == expected.dtype
         assert result.size == expected.size
@@ -341,6 +338,18 @@ class TestDemodulator16QAM:
         noise_i = rng.uniform(-0.2, 0.2, size=SYM_LENGTH) * 1j
         assert np.all(self.demodulator(modulator(data) + noise_r + noise_i) == data)
 
+    def test_against_matlab(self) -> None:
+        # Test against MATLAB's qammod(x, 16, 'gray'). There is more than one
+        # possible constellation, but it's nice to be compatible.
+        symbols = scipy.io.loadmat("test/matlab_16qam_gray.mat")["symgray"].ravel()
+        result = self.demodulator(symbols)
+
+        expected = ints_to_bits(np.arange(16), 4)
+
+        assert result.dtype == expected.dtype
+        assert result.size == expected.size
+        assert np.allclose(result, expected)
+
 
 class TestAlamoutiEncoder:
     encoder = AlamoutiEncoder()
@@ -381,7 +390,7 @@ class TestAlamoutiEncoder:
         assert np.allclose(odd, so)
         assert np.allclose(even, se)
 
-        # These signals are prefixed with 2048 QAM symbols for some reason.
+        # These signals are prefixed with 2048 QAM (for synchronization).
         # Following those, are the two Alamouti-coded signals (one for each
         # polarization)...
         sx2 = np.ravel(data["sx2"])[2048:]
