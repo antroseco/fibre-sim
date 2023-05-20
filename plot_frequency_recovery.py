@@ -102,15 +102,13 @@ def do_one() -> tuple[list[float], list[float], list[float], list[float], list[f
 
 
 def main() -> None:
-    sum_diff_384_estimates = np.zeros_like(F_OFFSETS)
-    sum_diff_832_estimates = np.zeros_like(F_OFFSETS)
-    sum_fft_256_estimates = np.zeros_like(F_OFFSETS)
-    sum_fft_512_estimates = np.zeros_like(F_OFFSETS)
-    sum_fft_1024_estimates = np.zeros_like(F_OFFSETS)
+    diff_384_samples = []
+    diff_832_samples = []
+    fft_256_samples = []
+    fft_512_samples = []
+    fft_1024_samples = []
 
-    N = 64
-
-    # TODO Plot variance.
+    N = 128
 
     for _ in range(N):
         (
@@ -121,17 +119,25 @@ def main() -> None:
             fft_1024_estimates,
         ) = do_one()
 
-        sum_diff_384_estimates += diff_384_estimates
-        sum_diff_832_estimates += diff_832_estimates
-        sum_fft_256_estimates += fft_256_estimates
-        sum_fft_512_estimates += fft_512_estimates
-        sum_fft_1024_estimates += fft_1024_estimates
+        diff_384_samples.append(diff_384_estimates)
+        diff_832_samples.append(diff_832_estimates)
+        fft_256_samples.append(fft_256_estimates)
+        fft_512_samples.append(fft_512_estimates)
+        fft_1024_samples.append(fft_1024_estimates)
 
-    sum_diff_384_estimates /= N
-    sum_diff_832_estimates /= N
-    sum_fft_256_estimates /= N
-    sum_fft_512_estimates /= N
-    sum_fft_1024_estimates /= N
+    def compute_mean(samples: list[list[float]]) -> NDArray[np.float64]:
+        # Transpose and sum to get a list of means by frequency.
+        return np.fromiter(
+            (sum(lst) / N for lst in zip(*samples)),
+            dtype=np.float64,
+            count=F_OFFSETS.size,
+        )
+
+    mean_diff_384 = compute_mean(diff_384_samples)
+    mean_diff_832 = compute_mean(diff_832_samples)
+    mean_fft_256 = compute_mean(fft_256_samples)
+    mean_fft_512 = compute_mean(fft_512_samples)
+    mean_fft_1024 = compute_mean(fft_1024_samples)
 
     def do_plot(estimates: NDArray[np.float64], marker: str, label: str) -> None:
         plt.plot(
@@ -143,18 +149,47 @@ def main() -> None:
         )
 
     plt.plot(F_OFFSETS, F_OFFSETS, alpha=0.5, lw=5, label="Target")
-    do_plot(sum_diff_832_estimates, "s-", "Li and Chen (832)")
-    do_plot(sum_diff_384_estimates, "s-", "Li and Chen (384)")
-    do_plot(sum_fft_1024_estimates, "o-", "1024-FFT")
-    do_plot(sum_fft_512_estimates, "o-", "512-FFT")
-    do_plot(sum_fft_256_estimates, "o-", "256-FFT")
+    do_plot(mean_diff_832, "s-", "Li and Chen (832)")
+    do_plot(mean_diff_384, "s-", "Li and Chen (384)")
+    do_plot(mean_fft_1024, "o-", "1024-FFT")
+    do_plot(mean_fft_512, "o-", "512-FFT")
+    do_plot(mean_fft_256, "o-", "256-FFT")
     plt.xlabel("True frequency offset (GHz)")
     plt.ylabel("Estimated frequency offset (GHz)")
     plt.title(
-        f"Low-pass filter pole: {LP_FILTER_POLE / 1e9:.1f} GHz; Averaged over {N} blocks"
+        f"Low-pass filter pole: {LP_FILTER_POLE / 1e9:.1f} GHz; "
+        f"Averaged over {N} blocks"
     )
     plt.legend()
     plt.axis("square")
+    plt.show()
+
+    def compute_std(samples: list[list[float]]) -> NDArray[np.float64]:
+        # Transpose and compute standard deviation by frequency.
+        return np.fromiter(
+            (np.std(lst, ddof=1) for lst in zip(*samples)),
+            dtype=np.float64,
+            count=F_OFFSETS.size,
+        )
+
+    std_diff_384 = compute_std(diff_384_samples)
+    std_diff_832 = compute_std(diff_832_samples)
+    std_fft_256 = compute_std(fft_256_samples)
+    std_fft_512 = compute_std(fft_512_samples)
+    std_fft_1024 = compute_std(fft_1024_samples)
+
+    do_plot(std_diff_832, "s-", "Li and Chen (832)")
+    do_plot(std_diff_384, "s-", "Li and Chen (384)")
+    do_plot(std_fft_1024, "o-", "1024-FFT")
+    do_plot(std_fft_512, "o-", "512-FFT")
+    do_plot(std_fft_256, "o-", "256-FFT")
+    plt.xlabel("True frequency offset (GHz)")
+    plt.ylabel("Estimate standard deviation (GHz)")
+    plt.title(
+        f"Low-pass filter pole: {LP_FILTER_POLE / 1e9:.1f} GHz; "
+        f"Standard deviation over {N} blocks"
+    )
+    plt.legend()
     plt.show()
 
 
