@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 
 from filters import AdaptiveEqualizer2P, CDCompensator, Decimate
-from frequency_recovery import FrequencyRecovery
 from modulation import DemodulatorDQPSK, DemodulatorQPSK, ModulatorQPSK
 from phase_recovery import DecisionDirected, ViterbiViterbi
 from utils import ints_to_bits
@@ -33,21 +32,14 @@ def demodulate(
     x_cd = cdcompensator(x_d)
     y_cd = cdcompensator(y_d)
 
-    # Frequency recovery.
-    freq_rec = FrequencyRecovery(20e9)
-    x_fr = freq_rec(x_cd)
-    y_fr = freq_rec(y_cd)
-
-    # CMA equalization. XXX the adaptive equalizer DOWNSAMPLES 2 to 1.
-    # TODO rotate by 0-45 deg (30?) and then back to fix ill-convergence.
-    rotation = np.exp(1j * np.pi * 29 / 180)
+    # CMA equalization. NOTE the adaptive equalizer DOWNSAMPLES 2 to 1.
     a_eq = AdaptiveEqualizer2P(5, 1e-3)
     a_eq.cma_to_rde_threshold = x.size * 2  # (only use CMA)
-    x_eq, y_eq = a_eq(np.row_stack((x_fr * rotation, y_fr * np.conj(rotation))))
+    x_eq, y_eq = a_eq(np.row_stack((x_cd, y_cd)))
 
     # Drop first 40_000 symbols, to ensure the adaptive equalizer has converged.
-    x_eq = x_eq[40_000:] * np.conj(rotation)
-    y_eq = y_eq[40_000:] * rotation
+    x_eq = x_eq[40_000:]
+    y_eq = y_eq[40_000:]
 
     # Phase recovery.
     if dd_phase_recovery:
