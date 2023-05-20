@@ -288,12 +288,14 @@ class TestDemodulator16QAM:
         # Enumerates the entire constellation column-by-column, starting with
         # leftmost column (in-phase = -3) and moving from bottom to top
         # (quadrature from -3 to +3).
-        # FIXME replace magic number.
         symbol_basis = (-3, -1, 1, 3)
         symbols = np.fromiter(
-            map(lambda r_i: r_i[0] + r_i[1] * 1j, product(symbol_basis, symbol_basis)),
+            map(
+                lambda r_i: r_i[0] + r_i[1] * 1j,
+                product(symbol_basis, symbol_basis),
+            ),
             dtype=np.cdouble,
-        ) / np.sqrt(10)
+        )
 
         data = self.demodulator(symbols)
 
