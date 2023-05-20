@@ -116,3 +116,68 @@ class FrequencyRecoveryFFT(Component):
         )
 
         return symbols
+
+
+class FrequencyRecoveryLiChen(Component):
+    def __init__(
+        self, symbol_rate: float, samples_per_symbol: int, block_size: int
+    ) -> None:
+        super().__init__()
+
+        assert symbol_rate > 0
+        self.symbol_rate = symbol_rate
+
+        assert samples_per_symbol > 0
+        self.samples_per_symbol = samples_per_symbol
+
+        assert block_size > 0
+        self.block_size = block_size
+
+        self.freq_estimate: Optional[float] = None
+
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_up_to_two_polarizations(symbols)
+
+        # Frequency offset should be very similar for both polarizations, so
+        # only estimate it using the first polarization.
+        first_pol = first_polarization(symbols)
+
+        # Resample quickly to 1 sample per symbol. This is required by the
+        # algorithm, as it operates on adjacent symbols.
+        downsampled = first_pol[:: self.samples_per_symbol]
+
+        # Avoid edge effects if possible. Slightly crude but works.
+        sample = (
+            downsampled[: self.block_size]
+            if downsampled.size < 1024 + self.block_size
+            else downsampled[1024 : 1024 + self.block_size]
+        )
+
+        # Based on M. Li and L. K. Chen, "Blind Carrier Frequency Offset
+        # Estimation Based on Eighth-Order Statistics for Coherent Optical QAM
+        # Systems," in IEEE Photonics Technology Letters, vol. 23, no. 21, pp.
+        # 1612-1614, Nov.1, 2011, doi: 10.1109/LPT.2011.2164788.
+        Yr = np.real(sample)
+        Yi = np.imag(sample)
+
+        Zr = Yr**4 + Yi**4 - 6 * Yr**2 * Yi**2
+        Zi = 4 * Yr**3 * Yi - 4 * Yr * Yi**3
+
+        Z = Zr + 1j * Zi
+
+        angle: np.float64 = np.angle(np.sum(np.conj(Z[:-1]) * Z[1:]))
+        self.freq_estimate = float(angle) / (8 * np.pi) * self.symbol_rate
+
+        # This block only estimates the frequency offset. It should be called
+        # *after* static and dynamic channel equalization has been performed.
+        # A separate block should read this estimate and compensate for the
+        # frequency offset *before* CD compensation.
+        return symbols

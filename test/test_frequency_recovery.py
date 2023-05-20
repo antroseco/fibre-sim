@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 from channel import Splitter, SSFChannel
 from filters import CDCompensator, PulseFilter
-from frequency_recovery import FrequencyRecoveryFFT
+from frequency_recovery import FrequencyRecoveryFFT, FrequencyRecoveryLiChen
 from laser import NoisyLaser
 from modulation import IQModulator, Modulator16QAM
 from receiver import Digital90degHybrid, HeterodyneFrontEnd
@@ -77,3 +77,25 @@ class TestFrequencyRecoveryFFT:
 
         # Large tolerance as phase recovery can handle the difference.
         assert np.isclose(np.mean(estimates), freq_offset_GHz * 1e9, atol=20e6)
+
+
+class TestFrequencyRecoveryLiChen:
+    @staticmethod
+    @pytest.mark.parametrize("freq_offset_GHz", np.linspace(-1.0, 1.0, 4))
+    def test_estimate(freq_offset_GHz: float) -> None:
+        # Use a long sample size to reduce the test's variability.
+        fr = FrequencyRecoveryLiChen(SYMBOL_RATE, RECEIVER_SPS, 832)
+
+        # Get an average---we are concerned about steady-state performance.
+        estimates = []
+        for _ in range(32):
+            symbols = generate_symbols(2048, freq_offset_GHz)
+
+            fr(symbols)
+
+            assert fr.freq_estimate is not None
+            estimates.append(fr.freq_estimate)
+
+        # Even larger tolerance; now 200 MHz. This method appears to have
+        # significant variance.
+        assert np.isclose(np.mean(estimates), freq_offset_GHz * 1e9, atol=200e6)
