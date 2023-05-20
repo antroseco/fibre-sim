@@ -159,7 +159,7 @@ class Modulator16QAM(Modulator):
     bits_per_symbol = 4
 
     @staticmethod
-    def impl(msbs: NDArray[np.bool_], lsbs: NDArray[np.bool_]) -> NDArray[np.float64]:
+    def impl(msbs: NDArray[np.bool_], lsbs: NDArray[np.bool_]) -> NDArray[np.int64]:
         assert msbs.size == lsbs.size
 
         # Looking at the two MSBs of the constellation symbols, we can see that
@@ -168,18 +168,10 @@ class Modulator16QAM(Modulator):
         # follow the same Gray code each time (00 -> 01 -> 11 -> 10), we only
         # need to look at two bits at a time to determine each component.
         #
-        # 3 boolean expressions are needed to determine each component, where
-        # the msbs and lsbs below refer to the MSB and LSB in each pair of bits.
-        # The first expression covers [01, 11, 10], the second [11, 10], and the
-        # third [10] only. Hence, each bit pattern may match multiple
-        # expressions. This should be considerably faster than matching one
-        # expression for each pattern and then multiplying by e.g. 3.
-        offsets = np.zeros_like(msbs, dtype=np.float64)
-        offsets += msbs | lsbs
-        offsets += msbs
-        offsets += msbs & ~lsbs
-
-        return offsets
+        # This function only needs to convert from Gray code to binary. It is
+        # straightforward to derive the following equation (only valid for 2
+        # bits) by tabulating the Gray-coded inputs next to the binary output.
+        return (msbs << 1) | (msbs ^ lsbs)
 
     def __call__(self, data: NDArray[np.bool_]) -> NDArray[np.cdouble]:
         super().__call__(data)
