@@ -441,18 +441,17 @@ class AdaptiveEqualizer(Component):
 
 
 class AdaptiveEqualizer2P(Component):
-    cma_to_rde_threshold = 256  # TODO find a good value.
-
-    def __init__(self, taps: int, mu: float) -> None:
+    def __init__(self, taps: int, mu: float, second_pol_thresh: int) -> None:
         super().__init__()
 
         assert taps > 0
         self.taps = taps
 
-        # FIXME 10**-2 is big, try 10**-4 to 10**-3
-        # Try correcting for chromatic dispersion (mismatch)
         assert mu > 0
         self.mu = mu
+
+        assert second_pol_thresh > 0
+        self.second_pol_thresh = second_pol_thresh
 
         # Filter coefficients.
         self.w1V = np.zeros(self.taps, dtype=np.cdouble)
@@ -460,7 +459,8 @@ class AdaptiveEqualizer2P(Component):
         self.w2V = np.zeros(self.taps, dtype=np.cdouble)
         self.w2H = np.zeros(self.taps, dtype=np.cdouble)
 
-        # Single spike initialization.
+        # Single spike initialization. One polarization only, we initialize the
+        # second one later.
         self.lag = floor(self.taps / 2) + 1
         self.w1V[self.lag - 1] = 1
 
@@ -478,12 +478,6 @@ class AdaptiveEqualizer2P(Component):
         assert has_two_polarizations(symbols)
 
         normalized = normalize_power(symbols)
-
-        # TODO train on the first e.g. 1000 symbols and then stop updating the
-        # filter.
-
-        R_cma = 1.32  # TODO explanation.
-        R_rde = np.asarray((1 / np.sqrt(5), 1, 3 / np.sqrt(5)))
 
         # Wrap input array.
         dataV = np.concatenate(
@@ -514,23 +508,27 @@ class AdaptiveEqualizer2P(Component):
             y1[i] = self.w1V.conj() @ xV + self.w1H.conj() @ xH
             y2[i] = self.w2V.conj() @ xV + self.w2H.conj() @ xH
 
-            if i < self.cma_to_rde_threshold:
-                # CMA update step.
-                self.w1V += self.mu * xV * (R_cma - np.abs(y1[i]) ** 2) * np.conj(y1[i])
-                self.w1H += self.mu * xH * (R_cma - np.abs(y1[i]) ** 2) * np.conj(y1[i])
-                self.w2V += self.mu * xV * (R_cma - np.abs(y2[i]) ** 2) * np.conj(y2[i])
-                self.w2H += self.mu * xH * (R_cma - np.abs(y2[i]) ** 2) * np.conj(y2[i])
-            else:
-                raise NotImplementedError()
-                # Get radius closest to the compensated symbol.
-                # r = R_rde[np.argmin(np.abs(R_rde - np.abs(y[i])))]
+            mag_y1 = np.abs(y1[i]) ** 2
+            mag_y2 = np.abs(y2[i]) ** 2
 
-                # RDE update step.
-                # self.w1V += self.mu * x * (r**2 - np.abs(y[i]) ** 2) * np.conj(y[i])
+            # CMA update step.
+            self.w1V += self.mu * xV * (1 - mag_y1) * np.conj(y1[i])
+            self.w1H += self.mu * xH * (1 - mag_y1) * np.conj(y1[i])
+            self.w2V += self.mu * xV * (1 - mag_y2) * np.conj(y2[i])
+            self.w2H += self.mu * xH * (1 - mag_y2) * np.conj(y2[i])
 
-            # TODO variable.
-            if i == 5_000:
-                # Reinitialize filter coefficients.
+            # Based on L. Liu, Z. Tao, W. Yan, S. Oda, T. Hoshida and J. C.
+            # Rasmussen, "Initial tap setup of constant modulus algorithm
+            # for polarization de-multiplexing in optical coherent
+            # receivers," 2009 Conference on Optical Fiber Communication,
+            # San Diego, CA, USA, 2009, pp. 1-3.
+            if i == self.second_pol_thresh:
+                # The tap values for tributary V have hopefully converged now.
+                # We can now use the relationship between the tap values of
+                # tributaries V and H to determine the initial tap values of
+                # tributary H (based on the Jones matrix of the fibre link).
+                # This initialization algorithm should avoid the CMA singularity
+                # problem.
                 self.w2H = np.conj(self.w1V[::-1])
                 self.w2V = -np.conj(self.w1H[::-1])
 

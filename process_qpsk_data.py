@@ -33,13 +33,12 @@ def demodulate(
     y_cd = cdcompensator(y_d)
 
     # CMA equalization. NOTE the adaptive equalizer DOWNSAMPLES 2 to 1.
-    a_eq = AdaptiveEqualizer2P(5, 1e-3)
-    a_eq.cma_to_rde_threshold = x.size * 2  # (only use CMA)
+    a_eq = AdaptiveEqualizer2P(7, 1e-3, 25_000)
     x_eq, y_eq = a_eq(np.row_stack((x_cd, y_cd)))
 
-    # Drop first 40_000 symbols, to ensure the adaptive equalizer has converged.
-    x_eq = x_eq[40_000:]
-    y_eq = y_eq[40_000:]
+    # Drop first 60_000 symbols, to ensure the adaptive equalizer has converged.
+    x_eq = x_eq[60_000:]
+    y_eq = y_eq[60_000:]
 
     # Phase recovery.
     if dd_phase_recovery:
@@ -118,7 +117,9 @@ def process_file(data_path: str, dd_phase_recovery: bool) -> tuple[float, float]
 
 
 def main() -> None:
-    dbms = range(-50, -33)
+    # We have data up to -34 dBm (inclusive), but the BER is very low so the
+    # graphs don't look great.
+    dbms = range(-50, -39)
     results_vv = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", False), dbms)
     results_dd = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", True), dbms)
     x_bers_vv, y_bers_vv = zip(*results_vv)
