@@ -14,7 +14,13 @@ from modulation import (
     ModulatorBPSK,
     ModulatorQPSK,
 )
-from utils import bits_to_ints, has_two_polarizations, ints_to_bits, row_size
+from utils import (
+    bits_to_ints,
+    has_two_polarizations,
+    ints_to_bits,
+    normalize_power,
+    row_size,
+)
 
 
 class TestModulatorBPSK:
@@ -201,7 +207,10 @@ class TestModulator16QAM:
 
         offsets = self.modulator.impl(msbs, lsbs)
 
-        # TODO explanation.
+        # The constellation is Gray-coded, i.e. the sequence is 00, 01, 11, 10.
+        # The in-phase and quadrature components each carry a 2-bit Gray-coded
+        # sequence. This test ensures that we can convert from binary to the
+        # Gray code used.
         assert offsets[0] == 0
         assert offsets[1] == 1
         assert offsets[2] == 3
@@ -225,20 +234,20 @@ class TestModulator16QAM:
 
         # Check constellation (diagram in the class definition).
         assert symbols[0] == -3 + 3j
-        assert symbols[1] == -1 + 3j
-        assert symbols[2] == 3 + 3j
-        assert symbols[3] == 1 + 3j
-        assert symbols[4] == -3 + 1j
+        assert symbols[1] == -3 + 1j
+        assert symbols[2] == -3 - 3j
+        assert symbols[3] == -3 - 1j
+        assert symbols[4] == -1 + 3j
         assert symbols[5] == -1 + 1j
-        assert symbols[6] == 3 + 1j
-        assert symbols[7] == 1 + 1j
-        assert symbols[8] == -3 - 3j
-        assert symbols[9] == -1 - 3j
+        assert symbols[6] == -1 - 3j
+        assert symbols[7] == -1 - 1j
+        assert symbols[8] == 3 + 3j
+        assert symbols[9] == 3 + 1j
         assert symbols[10] == 3 - 3j
-        assert symbols[11] == 1 - 3j
-        assert symbols[12] == -3 - 1j
-        assert symbols[13] == -1 - 1j
-        assert symbols[14] == 3 - 1j
+        assert symbols[11] == 3 - 1j
+        assert symbols[12] == 1 + 3j
+        assert symbols[13] == 1 + 1j
+        assert symbols[14] == 1 - 3j
         assert symbols[15] == 1 - 1j
 
     def test_odd_bit_lengths(self):
@@ -256,6 +265,23 @@ class TestModulator16QAM:
 
         with pytest.raises(Exception):
             self.modulator(np.zeros(1001, dtype=np.bool_))
+
+    def test_against_matlab(self) -> None:
+        # Test against MATLAB's qammod(x, 16, 'gray'). There is more than one
+        # possible constellation, but it's nice to be compatible.
+        expected = normalize_power(
+            scipy.io.loadmat(f"test/matlab_16qam_gray.mat")["symgray"].ravel()
+        )
+
+        data = ints_to_bits(np.arange(16), 4)
+        result = self.modulator(data)
+
+        print(expected[:4])
+        print(result[:4])
+
+        assert result.dtype == expected.dtype
+        assert result.size == expected.size
+        assert np.allclose(result, expected)
 
 
 class TestDemodulator16QAM:
@@ -282,22 +308,22 @@ class TestDemodulator16QAM:
 
         # Check that symbols have been demodulated correctly.
         ints = bits_to_ints(data, self.demodulator.bits_per_symbol)
-        assert ints[0] == 0b1000
-        assert ints[1] == 0b1100
-        assert ints[2] == 0b0100
+        assert ints[0] == 0b0010
+        assert ints[1] == 0b0011
+        assert ints[2] == 0b0001
         assert ints[3] == 0b0000
-        assert ints[4] == 0b1001
-        assert ints[5] == 0b1101
+        assert ints[4] == 0b0110
+        assert ints[5] == 0b0111
         assert ints[6] == 0b0101
-        assert ints[7] == 0b0001
-        assert ints[8] == 0b1011
+        assert ints[7] == 0b0100
+        assert ints[8] == 0b1110
         assert ints[9] == 0b1111
-        assert ints[10] == 0b0111
-        assert ints[11] == 0b0011
+        assert ints[10] == 0b1101
+        assert ints[11] == 0b1100
         assert ints[12] == 0b1010
-        assert ints[13] == 0b1110
-        assert ints[14] == 0b0110
-        assert ints[15] == 0b0010
+        assert ints[13] == 0b1011
+        assert ints[14] == 0b1001
+        assert ints[15] == 0b1000
 
     def test_combined(self):
         modulator = Modulator16QAM()
