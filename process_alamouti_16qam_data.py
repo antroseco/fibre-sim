@@ -1,4 +1,3 @@
-from functools import cache
 from typing import Any, TypeGuard
 
 import numpy as np
@@ -15,8 +14,8 @@ from utils import normalize_power
 plt.rcParams.update({"font.size": 14})
 
 
-# 32k 16-QAM symbols.
-qpsk_sync = np.ravel(sio.loadmat("data_alamouti/QPSK_sync.mat")["s"])
+# 32k 16-QAM symbols, repeated twice.
+qpsk_sync = np.tile(np.ravel(sio.loadmat("data_alamouti/QPSK_sync.mat")["s"]), 2)
 
 
 data_ref = np.ravel(sio.loadmat("data_alamouti/AC_data.mat")["s_qam"]) * (
@@ -31,13 +30,7 @@ def find_lag(in1: NDArray[np.cdouble], in2: NDArray[np.cdouble]) -> int:
     corr = np.abs(signal.correlate(in1, in2))
     lags = signal.correlation_lags(in1.size, in2.size)
 
-    peak_val = np.max(corr)
-
-    all_peaks = lags[corr > 0.9 * peak_val]
-
-    # Return the first peak; there are two sequences of QPSK data and we only
-    # want to lock on to the first one.
-    return min(all_peaks)
+    return lags[np.argmax(corr)]
 
 
 def is_cdouble_array(value: Any) -> TypeGuard[NDArray[np.cdouble]]:
@@ -105,7 +98,7 @@ def extract_first_frame(rx_pf: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
     rx_sync = rx_pf[2 * lag :]
 
     # Extract a single 16-QAM frame. Don't forget that it's a 2 SpS signal.
-    header_size = 2 * qpsk_sync.size
+    header_size = qpsk_sync.size
     block_size = data_ref.size
 
     return rx_sync[2 * header_size :][: 2 * block_size]
