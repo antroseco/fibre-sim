@@ -131,3 +131,4 @@ dmypy.json
 # Lab data
 data/
 data_alamouti/
+data_bence_paper/
