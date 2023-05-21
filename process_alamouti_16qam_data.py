@@ -38,12 +38,10 @@ def is_cdouble_array(value: Any) -> TypeGuard[NDArray[np.cdouble]]:
     return isinstance(value, np.ndarray) and value.dtype == np.cdouble
 
 
-def load_sample_data(rx_power: int) -> NDArray[np.cdouble]:
+def load_sample_data(data_path: str) -> NDArray[np.cdouble]:
     # 256 GSa/s, stored as 16-bit signed integers.
     # Convert to cdouble and normalize power.
-    data_256i = np.ravel(
-        sio.loadmat(f"data_bence_paper/capture_50G_run5_{rx_power}dBm.mat")["ch1"]
-    )
+    data_256i = np.ravel(sio.loadmat(data_path)["ch1"])
 
     # NOTE the mean is not 0, but subtracting it did not help at all.
     data_256d = data_256i.astype(np.cdouble)
@@ -125,21 +123,21 @@ def slog10(num: float) -> str:
     return f"{np.log10(num):.2f}" if num != 0 else "-inf "
 
 
-def process_file(rx_power: int) -> float:
-    data_recv = load_sample_data(rx_power)
+def process_file(data_path: str) -> float:
+    data_recv = load_sample_data(data_path)
 
     data_100 = run_front_end(data_recv)
     rx_pf = run_static_equalization(data_100)
     rx_16qam = extract_first_frame(rx_pf)
     ber = demodulate(rx_16qam)
 
-    print(f"{rx_power} BER: {ber:.2e}, log10(BER): {slog10(ber)}")
+    print(f"{data_path} BER: {ber:.2e}, log10(BER): {slog10(ber)}")
 
     return ber
 
 
 def main() -> None:
-    return process_file(-20)
+    return process_file(f"data_bence_paper/capture_50G_run5_-20dBm.mat")
 
     # We have data up to -34 dBm (inclusive), but the BER is very low so the
     # graphs don't look great.
