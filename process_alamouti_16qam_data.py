@@ -31,7 +31,13 @@ def find_lag(in1: NDArray[np.cdouble], in2: NDArray[np.cdouble]) -> int:
     corr = np.abs(signal.correlate(in1, in2))
     lags = signal.correlation_lags(in1.size, in2.size)
 
-    return lags[np.argmax(corr)]
+    peak_val = np.max(corr)
+
+    all_peaks = lags[corr > 0.9 * peak_val]
+
+    # Return the first peak; there are two sequences of QPSK data and we only
+    # want to lock on to the first one.
+    return min(all_peaks)
 
 
 def is_cdouble_array(value: Any) -> TypeGuard[NDArray[np.cdouble]]:
@@ -86,7 +92,7 @@ def run_static_equalization(data_100: NDArray[np.cdouble]) -> NDArray[np.cdouble
 
 def extract_first_frame(rx_pf: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
     # NOTE downsample to 1 SpS to match qpsk_sync.
-    lag = find_lag(rx_pf[0:50_000:2], np.conj(qpsk_sync))
+    lag = find_lag(rx_pf[0:100_000:2], np.conj(qpsk_sync))
     assert lag >= 0
 
     # Multiply lag by 2 as rx_pf is at 2 SpS.
