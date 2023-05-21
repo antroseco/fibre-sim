@@ -58,13 +58,19 @@ def load_sample_data(data_path: str) -> NDArray[np.cdouble]:
 def run_front_end(data_256d: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
     # Peak in the spectrum is the IF. Round to 3 decimal places; we shouldn't
     # have too high a precision.
+    spectrum = np.abs(np.fft.fft(data_256d))
+    freqs = np.fft.fftfreq(data_256d.size, d=1 / 256e9)
+
+    # Erase peaks outside the 26 GHz region.
+    spectrum[freqs < 24e9] = 0
+
     if_freq_GHz = round(
-        np.fft.fftfreq(data_256d.size, d=1 / 256e9)[np.argmax(np.fft.fft(data_256d))]
-        / 1e9,
+        freqs[np.argmax(spectrum)] / 1e9,
         3,
     )
 
-    print(f"IF = {if_freq_GHz} GHz")
+    if abs(if_freq_GHz - 26) > 0.5:
+        print(f"WARNING: IF = {if_freq_GHz} GHz")
 
     # XXX Do this first before resampling to 100 GS/s. Note that this IF is not
     # negative, unlike what we found when resample first!
