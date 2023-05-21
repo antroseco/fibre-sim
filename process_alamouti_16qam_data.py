@@ -118,7 +118,7 @@ def demodulate(rx_16qam: NDArray[np.cdouble]) -> float:
     assert rx_input.size == 2 * data_training.size
 
     aeq = AdaptiveEqualizerAlamouti(
-        49, 1e-3, 0.1, Modulator16QAM(), Demodulator16QAM(), data_training, True
+        49, 5e-4, 0.08, Modulator16QAM(), Demodulator16QAM(), data_training, False
     )
 
     rx_aeq = aeq(rx_input[0::2], rx_input[1::2])
