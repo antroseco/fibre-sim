@@ -50,13 +50,15 @@ def load_sample_data(data_path: str) -> NDArray[np.cdouble]:
 
 
 def run_front_end(data_256d: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-    # Peak in the spectrum is the IF.
-    if_freq_GHz = (
+    # Peak in the spectrum is the IF. Round to 3 decimal places; we shouldn't
+    # have too high a precision.
+    if_freq_GHz = round(
         np.fft.fftfreq(data_256d.size, d=1 / 256e9)[np.argmax(np.fft.fft(data_256d))]
-        / 1e9
+        / 1e9,
+        3,
     )
 
-    print(f"IF = {if_freq_GHz:.3f} GHz")
+    print(f"IF = {if_freq_GHz} GHz")
 
     # XXX Do this first before resampling to 100 GS/s. Note that this IF is not
     # negative, unlike what we found when resample first!
@@ -137,29 +139,22 @@ def process_file(data_path: str) -> float:
 
 
 def main() -> None:
-    return process_file(f"data_bence_paper/capture_50G_run5_-20dBm.mat")
-
-    # We have data up to -34 dBm (inclusive), but the BER is very low so the
-    # graphs don't look great.
-    dbms = range(-50, -39)
-    results_vv = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", False), dbms)
-    results_dd = map(lambda i: process_file(f"data/data_{np.abs(i)}.mat", True), dbms)
-    x_bers_vv, y_bers_vv = zip(*results_vv)
-    x_bers_dd, y_bers_dd = zip(*results_dd)
-
-    # TODO fit theoretical curve (2x BER of QPSK).
+    # Have data from -25 dBm to -19 dBm, inclusive.
+    # TODO second run.
+    dbms = range(-25, -18)
+    bers_1 = map(
+        lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i}dBm.mat"),
+        dbms,
+    )
 
     fig, ax = plt.subplots()
 
-    ax.plot(dbms, x_bers_vv, label="X pol. (VV)", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, y_bers_vv, label="Y pol. (VV)", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, x_bers_dd, label="X pol. (DD)", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, y_bers_dd, label="Y pol. (DD)", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, list(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
     ax.set_yscale("log")
     ax.set_xlabel("Received Power [dBm]")
     ax.set_ylabel("BER")
     ax.legend()
-    ax.set_title("DP-DQPSK, 10 GBd, 100 km")
+    ax.set_title("16-QAM, 50 GBd, 25 km")
 
     fig.tight_layout()
 
