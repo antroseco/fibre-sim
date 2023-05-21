@@ -152,24 +152,33 @@ def process_file(data_path: str) -> float:
 
 def main() -> None:
     # Have data from -25 dBm to -19 dBm, inclusive.
-    # TODO second run.
     dbms = range(-25, -18)
-    bers_1 = map(
-        lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i}dBm.mat"),
-        dbms,
+    bers_1 = np.fromiter(
+        map(
+            lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i}dBm.mat"),
+            dbms,
+        ),
+        np.float64,
     )
-    bers_2 = map(
-        lambda i: process_file(f"data_bence_paper/capture_50G_run6_{i}dBm.mat"),
-        dbms,
+    bers_2 = np.fromiter(
+        map(
+            lambda i: process_file(f"data_bence_paper/capture_50G_run6_{i}dBm.mat"),
+            dbms,
+        ),
+        np.float64,
     )
 
     fig, ax = plt.subplots()
 
-    ax.plot(dbms, list(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, list(bers_2), label="Run 2", alpha=0.6, linewidth=2, marker="s")
-    ax.set_yscale("log")
+    ax.plot(dbms, np.log10(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, np.log10(bers_2), label="Run 2", alpha=0.6, linewidth=2, marker="s")
+
+    orig_lims = ax.get_xlim()
+    ax.hlines(-2, *orig_lims, label="FEC limit", alpha=0.4, linewidth=4)
+    ax.set_xlim(orig_lims)
+
     ax.set_xlabel("Received Power [dBm]")
-    ax.set_ylabel("BER")
+    ax.set_ylabel(r"$\log_{10}$BER")
     ax.legend()
     ax.set_title("16-QAM, 50 GBd, 25 km")
 
