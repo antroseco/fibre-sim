@@ -146,10 +146,15 @@ def main() -> None:
         lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i}dBm.mat"),
         dbms,
     )
+    bers_2 = map(
+        lambda i: process_file(f"data_bence_paper/capture_50G_run6_{i}dBm.mat"),
+        dbms,
+    )
 
     fig, ax = plt.subplots()
 
     ax.plot(dbms, list(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
+    ax.plot(dbms, list(bers_2), label="Run 2", alpha=0.6, linewidth=2, marker="s")
     ax.set_yscale("log")
     ax.set_xlabel("Received Power [dBm]")
     ax.set_ylabel("BER")
