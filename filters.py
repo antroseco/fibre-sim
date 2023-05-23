@@ -481,32 +481,16 @@ class AdaptiveEqualizer2P(Component):
 
         normalized = normalize_power(symbols)
 
-        # Wrap input array.
-        dataV = np.concatenate(
-            (
-                normalized[0, -self.lag + 1 :],
-                normalized[0, :],
-                normalized[0, : self.lag],
-            )
-        )
-        dataH = np.concatenate(
-            (
-                normalized[1, -self.lag + 1 :],
-                normalized[1, :],
-                normalized[1, : self.lag],
-            )
-        )
-        assert dataV.size == row_size(normalized) + self.w1V.size
-        assert dataH.size == row_size(normalized) + self.w1V.size
-
-        # Output array. Downsample 2:1. TODO add parameter for this.
+        # Output array. Downsamples 2:1.
         y1 = np.empty(ceil(row_size(normalized) / 2), dtype=np.cdouble)
-        y2 = np.empty(ceil(row_size(normalized) / 2), dtype=np.cdouble)
+        y2 = np.empty_like(y1)
 
-        for i in range(y1.size):
-            xV = dataV[2 * i : 2 * i + self.w1V.size]
-            xH = dataH[2 * i : 2 * i + self.w1H.size]
-
+        i: Optional[int] = None
+        for i, xV, xH in zip(
+            count(),
+            convmtx(normalized[0, :], self.taps, "same", 2),
+            convmtx(normalized[1, :], self.taps, "same", 2),
+        ):
             y1[i] = self.w1V.conj() @ xV + self.w1H.conj() @ xH
             y2[i] = self.w2V.conj() @ xV + self.w2H.conj() @ xH
 
@@ -533,6 +517,10 @@ class AdaptiveEqualizer2P(Component):
                 # problem.
                 self.w2H = np.conj(self.w1V[::-1])
                 self.w2V = -np.conj(self.w1H[::-1])
+        else:
+            # Ensure we've outputted all symbols.
+            assert i is not None
+            assert i + 1 == y1.size == y2.size
 
         # FIXME should vstack.
         return y1, y2
