@@ -89,8 +89,7 @@ def slog10(num: float) -> str:
 
 
 def process_file(data_path: str, dd_phase_recovery: bool) -> tuple[float, float]:
-    # Rotate by 45 deg to correct the weird constellation.
-    data_recv = scipy.io.loadmat(data_path)["data"] * np.exp(1j * np.pi / 4)
+    data_recv = scipy.io.loadmat(data_path)["data"]
 
     # Decoded DQPSK data.
     data_refd = scipy.io.loadmat("data/refdata512.mat")["refdatad"].ravel()
