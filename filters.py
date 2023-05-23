@@ -491,17 +491,19 @@ class AdaptiveEqualizer2P(Component):
             convmtx(normalized[0, :], self.taps, "same", 2),
             convmtx(normalized[1, :], self.taps, "same", 2),
         ):
+            # Outputs.
             y1[i] = self.w1V.conj() @ xV + self.w1H.conj() @ xH
             y2[i] = self.w2V.conj() @ xV + self.w2H.conj() @ xH
 
-            mag_y1 = np.abs(y1[i]) ** 2
-            mag_y2 = np.abs(y2[i]) ** 2
+            # Error terms.
+            e1 = 1 - np.abs(y1[i]) ** 2
+            e2 = 1 - np.abs(y2[i]) ** 2
 
             # CMA update step.
-            self.w1V += self.mu * xV * (1 - mag_y1) * np.conj(y1[i])
-            self.w1H += self.mu * xH * (1 - mag_y1) * np.conj(y1[i])
-            self.w2V += self.mu * xV * (1 - mag_y2) * np.conj(y2[i])
-            self.w2H += self.mu * xH * (1 - mag_y2) * np.conj(y2[i])
+            self.w1V += self.mu * xV * e1 * np.conj(y1[i])
+            self.w1H += self.mu * xH * e1 * np.conj(y1[i])
+            self.w2V += self.mu * xV * e2 * np.conj(y2[i])
+            self.w2H += self.mu * xH * e2 * np.conj(y2[i])
 
             # Based on L. Liu, Z. Tao, W. Yan, S. Oda, T. Hoshida and J. C.
             # Rasmussen, "Initial tap setup of constant modulus algorithm
