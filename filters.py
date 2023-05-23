@@ -1,4 +1,5 @@
 from functools import cache, cached_property
+from itertools import count
 from math import ceil, floor
 from typing import Optional, Type
 
@@ -13,6 +14,7 @@ from modulation import Demodulator, Modulator
 from utils import (
     Component,
     Signal,
+    convmtx,
     for_each_polarization,
     has_one_polarization,
     has_two_polarizations,
@@ -614,13 +616,6 @@ class AdaptiveEqualizerAlamouti(Component):
 
         symbols_odd, symbols_even = self.serial_to_parallel(symbols)
 
-        # Pad input array.
-        extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag))
-        extended_even = np.pad(symbols_even, (self.lag - 1, self.lag))
-
-        assert extended_odd.size == symbols_odd.size + self.w11.size
-        assert extended_even.size == symbols_even.size + self.w22.size
-
         # Output array. We output 2 symbols for every 4 samples.
         y = np.empty(symbols.size // 2, dtype=np.cdouble)
 
@@ -630,10 +625,12 @@ class AdaptiveEqualizerAlamouti(Component):
             self.e_oC_log = np.empty_like(self.p_log)
             self.e_eC_log = np.empty_like(self.p_log)
 
-        for i in range(0, symbols_odd.size, 2):
-            u_o = extended_odd[i : i + self.w11.size]
-            u_e = extended_even[i : i + self.w22.size]
-
+        i: Optional[int] = None
+        for i, u_o, u_e in zip(
+            count(0, 2),
+            convmtx(symbols_odd, self.taps, "same", 2),
+            convmtx(symbols_even, self.taps, "same", 2),
+        ):
             u_eC = np.conj(u_e)
 
             p = self.p
@@ -673,5 +670,9 @@ class AdaptiveEqualizerAlamouti(Component):
 
             # FIXME eventually output decisions.
             y[i : i + 2] = v_o, v_e
+        else:
+            # Ensure we've outputted all symbols.
+            assert i is not None
+            assert i + 2 == y.size
 
         return y
