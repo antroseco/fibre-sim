@@ -584,8 +584,6 @@ class AdaptiveEqualizerAlamouti(Component):
         self.e_oC_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
         self.e_eC_log: NDArray[np.cdouble] = np.empty(0, dtype=np.cdouble)
 
-        self.first = True
-
     @property
     def input_type(self) -> tuple[Signal, Type, Optional[int]]:
         return Signal.SYMBOLS, np.cdouble, 2
@@ -651,13 +649,7 @@ class AdaptiveEqualizerAlamouti(Component):
             v_o = u_11 * pC + u_12 * p
             v_e = u_21 * pC + u_22 * p
 
-            if self.first and i + 2 <= self.training_symbols.size:
-                d_o, d_e = self.training_symbols[i : i + 2]
-            else:
-                # Need to modulate the decided bits again to recover their symbol.
-                # FIXME verify scale = 1.
-                decisions = self.demodulator(np.asarray((v_o, v_e)), 1)
-                d_o, d_e = self.modulator(decisions)
+            d_o, d_e = self.training_symbols[i : i + 2]
 
             # Compute errors.
             e_oC = np.conj(d_o - v_o)
@@ -681,9 +673,5 @@ class AdaptiveEqualizerAlamouti(Component):
 
             # FIXME eventually output decisions.
             y[i : i + 2] = v_o, v_e
-
-        # FIXME we should be able to use training symbols after the first block
-        # (e.g. if the block size is 64).
-        self.first = False
 
         return y
