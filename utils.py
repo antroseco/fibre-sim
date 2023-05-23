@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Callable, Optional, Type, overload
+from math import floor
+from typing import Any, Callable, Iterator, Literal, Optional, Type, overload
 
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy import signal
 from scipy.constants import speed_of_light
-from scipy.optimize import minimize_scalar, OptimizeResult
+from scipy.optimize import OptimizeResult, minimize_scalar
 from scipy.special import erfc
 
 
@@ -433,3 +434,26 @@ def plot_filter(fir_filter: NDArray[np.cdouble]) -> None:
 
     fig.tight_layout()
     fig.show()
+
+
+def convmtx(
+    data: NDArray[Any], filter_length: int, mode: Literal["full", "same"]
+) -> Iterator[NDArray[Any]]:
+    assert has_one_polarization(data)
+    assert mode in ("full", "same")
+    # We can relax this if necessary.
+    assert data.size >= filter_length
+
+    if mode == "full":
+        # Returns N + M - 1 columns.
+        pad_left = filter_length - 1
+        pad_right = filter_length - 1
+    else:  # mode == "same"
+        # Returns N columns.
+        pad_left = floor(filter_length / 2)
+        pad_right = filter_length - pad_left - 1
+
+    padded = np.pad(data, (pad_left, pad_right))
+
+    for i in range(padded.size - filter_length + 1):
+        yield padded[i : i + filter_length][::-1]

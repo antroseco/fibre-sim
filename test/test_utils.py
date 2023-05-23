@@ -10,6 +10,7 @@ from utils import (
     bits_to_ints,
     calculate_awgn_ber_with_bpsk,
     calculate_awgn_ser_with_qam,
+    convmtx,
     for_each_polarization,
     has_one_polarization,
     has_two_polarizations,
@@ -275,3 +276,56 @@ class TestForEachPolarization:
         assert doubled.dtype == test_data.dtype
 
         assert np.allclose(doubled, test_data * 2)
+
+
+class TestConvmtx:
+    @staticmethod
+    def test_full():
+        res_iter = convmtx(np.arange(1, 4), 3, "full")
+
+        assert np.allclose(next(res_iter), [1, 0, 0])
+        assert np.allclose(next(res_iter), [2, 1, 0])
+        assert np.allclose(next(res_iter), [3, 2, 1])
+        assert np.allclose(next(res_iter), [0, 3, 2])
+        assert np.allclose(next(res_iter), [0, 0, 3])
+
+        with pytest.raises(StopIteration):
+            next(res_iter)
+
+    @staticmethod
+    def test_same():
+        res_iter = convmtx(np.arange(1, 4), 3, "same")
+
+        assert np.allclose(next(res_iter), [2, 1, 0])
+        assert np.allclose(next(res_iter), [3, 2, 1])
+        assert np.allclose(next(res_iter), [0, 3, 2])
+
+        with pytest.raises(StopIteration):
+            next(res_iter)
+
+    @staticmethod
+    def test_full_against_np():
+        data = np.arange(1024)
+        h = np.arange(10) + 10
+
+        expected = np.convolve(data, h, "full")
+
+        result = np.empty(data.size + h.size - 1)
+        for i, data_slice in enumerate(convmtx(data, h.size, "full")):
+            result[i] = h @ data_slice
+
+        assert np.allclose(result, expected)
+
+    @staticmethod
+    @pytest.mark.parametrize("data_len", (10, 16, 32, 256, 512, 1024))
+    def test_same_against_np(data_len: int):
+        data = np.arange(data_len)
+        h = np.arange(10) + 10
+
+        expected = np.convolve(data, h, "same")
+
+        result = np.empty(data.size)
+        for i, data_slice in enumerate(convmtx(data, h.size, "same")):
+            result[i] = h @ data_slice
+
+        assert np.allclose(result, expected)
