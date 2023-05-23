@@ -607,7 +607,7 @@ class AdaptiveEqualizerAlamouti(Component):
         symbols_odd, symbols_even = self.serial_to_parallel(symbols)
 
         # Output array. We output 2 symbols for every 4 samples.
-        y = np.empty(symbols.size // 2, dtype=np.cdouble)
+        y = np.empty_like(symbols_odd)
 
         if self.instrument:
             # One iteration per 4 samples.
