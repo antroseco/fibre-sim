@@ -619,9 +619,9 @@ class AdaptiveEqualizerAlamouti(Component):
 
         symbols_odd, symbols_even = self.serial_to_parallel(symbols)
 
-        # Wrap input array.
-        extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag), mode="wrap")
-        extended_even = np.pad(symbols_even, (self.lag - 1, self.lag), mode="wrap")
+        # Pad input array.
+        extended_odd = np.pad(symbols_odd, (self.lag - 1, self.lag))
+        extended_even = np.pad(symbols_even, (self.lag - 1, self.lag))
 
         assert extended_odd.size == symbols_odd.size + self.w11.size
         assert extended_even.size == symbols_even.size + self.w22.size
