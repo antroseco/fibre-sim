@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy import signal
 from scipy.constants import speed_of_light
+from scipy.optimize import minimize_scalar, OptimizeResult
 from scipy.special import erfc
 
 
@@ -181,6 +182,35 @@ def is_power_of_2(value: int) -> bool:
     return value > 0 and value & (value - 1) == 0
 
 
+def optimum_overlap_save_frame_size(h_size: int) -> int:
+    # M is the order of the filter.
+    M = h_size - 1
+
+    if M < 1:
+        # M is a single tap. Cost is now proportional to log(N), so just pick a
+        # small N.
+        return 32
+
+    def cost(N: float) -> float:
+        with np.errstate(divide="ignore"):
+            return (N * np.log2(N) + N) / (N - M)
+
+    # M**2 > N for all M > 7.
+    upper_bound = max(M, 8) ** 2
+
+    res: OptimizeResult = minimize_scalar(cost, bounds=(M, upper_bound))
+
+    assert res.success
+    assert res.x > 0
+
+    # Block size should always be a power of 2. next_power_of_2() returns its
+    # argument if it's already a power of 2.
+    next_N = next_power_of_2(res.x)
+    prev_N = next_N // 2
+
+    return prev_N if cost(prev_N) <= cost(next_N) else next_N
+
+
 def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdouble]:
     # Ensure neither array is empty.
     assert h.ndim == 1
@@ -188,9 +218,8 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
     assert x.ndim == 1
     assert x.size >= 1
 
-    # N is the frame length. Based on:
-    # https://commons.wikimedia.org/wiki/File:FFT_size_vs_filter_length_for_Overlap-add_convolution.svg
-    N = max(128, next_power_of_2(h.size) * 8)
+    # Impose a minimum frame size. We want this to be sufficiently parallel.
+    N = max(optimum_overlap_save_frame_size(h.size), 32)
 
     # M is the order of the filter.
     M = h.size - 1

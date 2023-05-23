@@ -18,6 +18,7 @@ from utils import (
     next_power_of_2,
     normalize_energy,
     normalize_power,
+    optimum_overlap_save_frame_size,
     overlap_save,
     power_dbm_to_lin,
     signal_energy,
@@ -128,6 +129,22 @@ class TestOverlapSave:
 
         with pytest.raises(Exception):
             overlap_save(np.arange(1), np.arange(0))
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "h_size,expected",
+        (
+            (4, 16),
+            (5, 16),
+            # M=8 is a special case: N=32 and N=64 are both optimal, should
+            # return the smallest of the two.
+            (8, 32),
+            (60, 512),
+            (150, 1024),
+        ),
+    )
+    def test_optimum_overlap_save_frame_size(h_size: int, expected: int) -> None:
+        assert optimum_overlap_save_frame_size(h_size) == expected
 
 
 class TestEnergy:
