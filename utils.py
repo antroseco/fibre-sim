@@ -433,7 +433,7 @@ def plot_filter(fir_filter: NDArray[np.cdouble]) -> None:
     ax2.axis("tight")
 
     fig.tight_layout()
-    fig.show()
+    plt.show()
 
 
 def convmtx(

@@ -40,6 +40,7 @@ from utils import (
     energy_db_to_lin,
     is_power_of_2,
     next_power_of_2,
+    plot_filter,
     plot_signal,
 )
 
@@ -284,6 +285,13 @@ def plot_cd_compensation_ber() -> None:
     ax.legend()
 
     plt.show()
+
+
+def plot_cd_compensation_freq_response() -> None:
+    # Use a sufficiently large number of taps to get a decent graph.
+    cdc = CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, 99)
+    plot_filter(cdc.D)
+    plot_filter(cdc.h)
 
 
 def plot_awgn_simulations(concurrent: bool = True) -> None:
