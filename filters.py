@@ -295,8 +295,10 @@ class CDCompensator(CDBase):
         pi_3_4 = np.pi * 3 / 4
 
         erf_arg = np.exp(1j * pi_3_4) / (2 * np.sqrt(K))
-        erf_small = erf(erf_arg * (2 * K * np.pi - n))
-        erf_large = erf(erf_arg * (2 * K * np.pi + n))
+        # NOTE we use Ω here instead of π (like the paper), as we want a
+        # low-pass filter. The paper gives the full-band case for D(n) only.
+        erf_small = erf(erf_arg * (2 * K * self.omega - n))
+        erf_large = erf(erf_arg * (2 * K * self.omega + n))
 
         D = erf_small + erf_large
         D *= np.exp(-1j * (n**2 / (4 * K) + pi_3_4)) / (4 * np.sqrt(np.pi * K))
@@ -321,17 +323,8 @@ class CDCompensator(CDBase):
 
     @cached_property
     def h(self) -> NDArray[np.cdouble]:
-        # Matrix becomes singular *very* quickly.
-        # QQ = self.Q + 1e-14 * np.eye(self.fir_length)
-        # print(QQ.shape, np.linalg.matrix_rank(QQ))
-        # print(np.linalg.det(QQ))
-        # print(np.linalg.cond(QQ))
-
-        # FIXME Paper uses ε = 1e-14, although there is some flexibility.
-        # return np.linalg.solve(self.Q + np.eye(self.fir_length), self.D)
-        # return np.conj(np.linalg.lstsq(self.Q, self.D, rcond=0.9)[0])
-        # FIXME we get better results without Q.
-        return np.conj(self.D)
+        # ε = 1e-5 appears to give the least pass-band ripple.
+        return np.conj(np.linalg.inv(self.Q + 1e-5 * np.eye(self.fir_length)) @ self.D)
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
