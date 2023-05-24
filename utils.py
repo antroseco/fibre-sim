@@ -437,7 +437,10 @@ def plot_filter(fir_filter: NDArray[np.cdouble]) -> None:
 
 
 def convmtx(
-    data: NDArray[Any], filter_length: int, mode: Literal["full", "same"]
+    data: NDArray[Any],
+    filter_length: int,
+    mode: Literal["full", "same"],
+    stride: int = 1,
 ) -> Iterator[NDArray[Any]]:
     assert has_one_polarization(data)
     assert mode in ("full", "same")
@@ -455,5 +458,5 @@ def convmtx(
 
     padded = np.pad(data, (pad_left, pad_right))
 
-    for i in range(padded.size - filter_length + 1):
+    for i in range(0, padded.size - filter_length + 1, stride):
         yield padded[i : i + filter_length][::-1]
