@@ -422,14 +422,14 @@ def plot_filter(fir_filter: NDArray[np.cdouble]) -> None:
     fig, ax1 = plt.subplots()
 
     ax1.set_title("Digital filter frequency response")
-    ax1.plot(w, 20 * np.log10(abs(h)), "b")
-    ax1.set_ylabel("Amplitude [dB]", color="b")
+    ax1.plot(w, 20 * np.log10(abs(h)), "C0")
+    ax1.set_ylabel("Amplitude [dB]", color="C0")
     ax1.set_xlabel("Frequency [rad/sample]")
 
     ax2 = ax1.twinx()
     angles = np.unwrap(np.angle(h))
-    ax2.plot(w, angles, "m")
-    ax2.set_ylabel("Phase [rad]", color="m")
+    ax2.plot(w, angles, "C1")
+    ax2.set_ylabel("Phase [rad]", color="C1")
     ax2.axis("tight")
 
     fig.tight_layout()
