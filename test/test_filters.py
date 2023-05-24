@@ -180,6 +180,17 @@ class TestChromaticDispersion:
 
         assert np.allclose(q_expected, self.compensator.Q)
 
+    @staticmethod
+    @pytest.mark.parametrize("taps", (5, 41, 101))
+    def test_d_against_matlab(taps: int) -> None:
+        cdc = CDCompensator(25_000, 100e9, 2, taps)
+
+        expected = scipy.io.loadmat(f"test/matlab_cdc_{taps}_taps.mat")["ans"]
+
+        assert cdc.D.size == expected.size
+        assert cdc.D.dtype == expected.dtype
+        assert np.allclose(cdc.D, expected)
+
 
 class TestSSFChannel:
     FIBRE_LENGTH = 25_000
