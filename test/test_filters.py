@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import scipy.io
 from numpy.typing import NDArray
+from scipy.linalg import toeplitz
 
 from channel import SSFChannel
 from filters import (
@@ -178,7 +179,7 @@ class TestChromaticDispersion:
 
         np.fill_diagonal(q_expected, self.compensator.omega / np.pi)
 
-        assert np.allclose(q_expected, self.compensator.Q)
+        assert np.allclose(q_expected, toeplitz(self.compensator.Q_column))
 
     @staticmethod
     @pytest.mark.parametrize("taps", (5, 41, 101))

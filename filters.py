@@ -6,7 +6,7 @@ from typing import Optional, Type
 import numpy as np
 from numpy.typing import NDArray
 from scipy.constants import speed_of_light
-from scipy.linalg import toeplitz
+from scipy.linalg import solve_toeplitz
 from scipy.signal import decimate
 from scipy.special import erf
 
@@ -310,7 +310,7 @@ class CDCompensator(CDBase):
         return np.pi * (1 + self.beta) / self.samples_per_symbol
 
     @cached_property
-    def Q(self) -> NDArray[np.float64]:
+    def Q_column(self) -> NDArray[np.float64]:
         # Q is a Hermitian Toeplitz matrix, so we only need to compute its first
         # column.
         n = np.arange(self.fir_length)
@@ -319,12 +319,17 @@ class CDCompensator(CDBase):
         first_column[0] = self.omega / np.pi  # n = 0 is a special case.
         first_column[1:] = np.sin(n[1:] * self.omega) / (n[1:] * np.pi)
 
-        return toeplitz(first_column)
+        return first_column
 
     @cached_property
     def h(self) -> NDArray[np.cdouble]:
         # ε = 1e-5 appears to give the least pass-band ripple.
-        return np.conj(np.linalg.inv(self.Q + 1e-5 * np.eye(self.fir_length)) @ self.D)
+        # NOTE need to copy() the array, otherwise we're modifying the cached
+        # value in-place.
+        Q_column = self.Q_column.copy()
+        Q_column[0] += 1e-5
+
+        return np.conj(solve_toeplitz(Q_column, self.D))
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
