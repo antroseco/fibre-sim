@@ -240,8 +240,9 @@ def plot_cd_compensation_fir() -> None:
 
 def plot_cd_compensation_ber() -> None:
     """Find the optimal number of taps for the CD compensation filter, at
-    Eb/N0 = 10 db (where the BER of 16-QAM over an AWGN is near 10**-3)."""
-    EB_N0 = energy_db_to_lin(10)
+    Eb/N0 = 8 db (where the BER of 16-QAM over an AWGN is near 10**-2)."""
+    EB_N0_dB = 8
+    EB_N0 = energy_db_to_lin(EB_N0_dB)
 
     def simulation(fibre_length: int, taps: int) -> float:
         system = (
@@ -254,11 +255,11 @@ def plot_cd_compensation_ber() -> None:
             PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
             Demodulator16QAM(),
         )
-        return simulate_impl(system, 2**17)
+        return simulate_impl(system, 2**18)
 
     # We can't pickle local functions, so we can't use an executor
     # unfortunately.
-    sim_taps = np.arange(27, 159, 2)
+    sim_taps = np.arange(3, 75, 2)
     sim_bers_25 = list(map(simulation, cycle((25_000,)), sim_taps))
     sim_bers_50 = list(map(simulation, cycle((50_000,)), sim_taps))
     sim_bers_100 = list(map(simulation, cycle((100_000,)), sim_taps))
@@ -270,13 +271,16 @@ def plot_cd_compensation_ber() -> None:
     ax.plot(sim_taps, sim_bers_25, alpha=0.6, linewidth=2, label="25 km", marker="o")
     ax.plot(sim_taps, sim_bers_50, alpha=0.6, linewidth=2, label="50 km", marker="o")
     ax.plot(sim_taps, sim_bers_100, alpha=0.6, linewidth=2, label="100 km", marker="o")
-    ax.hlines(th_ber, 20, 170, label="Theoretical limit", color="purple")
 
-    ax.set_ylim(10**-3)
+    xlims = ax.get_xlim()
+    ax.hlines(th_ber, *xlims, label="Theoretical limit", color="purple")
+    ax.set_xlim(xlims)
+
+    ax.set_ylim(6e-3)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
     ax.set_xlabel("CD compensation filter taps")
-    ax.set_title("At $E_b/N_0 = 10$ dB")
+    ax.set_title(f"At $E_b/N_0 = {EB_N0_dB}$ dB")
     ax.legend()
 
     plt.show()
