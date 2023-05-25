@@ -161,6 +161,9 @@ def main() -> None:
         np.float64,
     )
 
+    print(f"***MEAN BER (1) = {np.mean(bers_1):.2e}***")
+    print(f"***MEAN BER (2) = {np.mean(bers_2):.2e}***")
+
     fig, ax = plt.subplots()
 
     ax.plot(dbms, np.log10(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
@@ -172,6 +175,13 @@ def main() -> None:
 
     ax.set_xlabel("Received Power [dBm]")
     ax.set_ylabel(r"$\log_{10}$BER")
+
+    # BER should be a straight line on a semi-log plot.
+    ax.set_yscale("symlog", linthresh=0.1)
+    yticks = np.arange(-2.6, -1.6, 0.2)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(map("{:.1f}".format, yticks))
+
     ax.legend()
     ax.set_title("16-QAM, 50 GBd, 25 km")
 
