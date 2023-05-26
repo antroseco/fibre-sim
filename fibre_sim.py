@@ -525,11 +525,11 @@ def plot_cd_ber_comparison() -> None:
         th_ber_16qam = calculate_awgn_ber_with_16qam(eb_n0s)
         ax.plot(eb_n0_dbs, th_ber_16qam, alpha=0.2, linewidth=5, label="Theoretical")
 
-        ax.set_xlabel("$E_b/N_0$ (dB)")
+        ax.set_xlabel("$E_b/N_0$ [dB]")
         ax.legend()
         ax.set_title(f"{fibre_length_km} km")
 
-    fig, axs = plt.subplots(ncols=2, sharey=True, figsize=(6.4 * 2, 4.8))
+    fig, axs = plt.subplots(ncols=2, sharey=True, figsize=(6.4 * 1.5, 4.8))
 
     plot_one(axs[0], 1)
     plot_one(axs[1], 25)
