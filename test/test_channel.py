@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
 
-from channel import AWGN, DropPolarization, PolarizationRotation, Splitter
+from channel import AWGN, DropPolarization, PolarizationRotation, SetPower, Splitter
 from utils import (
     energy_db_to_lin,
     has_one_polarization,
+    power_dbm_to_lin,
     row_size,
     signal_energy,
     signal_power,
@@ -178,3 +179,18 @@ class TestDropPolarization:
         assert row_size(first_polarization) == row_size(test_data)
 
         assert np.allclose(first_polarization, test_data[0])
+
+
+class TestSetPower:
+    @staticmethod
+    @pytest.mark.parametrize("power_dBm", (-30, -10, 11))
+    def test_set_power(power_dBm: float) -> None:
+        set_power = SetPower(power_dBm)
+
+        test_data = np.arange(1024, dtype=np.cdouble).reshape(2, -1) + 2j
+        output = set_power(test_data)
+
+        assert output.dtype == test_data.dtype
+        assert output.shape == test_data.shape
+        assert np.isfinite(output).all()
+        assert np.isclose(signal_power(output), power_dbm_to_lin(power_dBm))

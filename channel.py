@@ -12,6 +12,7 @@ from utils import (
     has_two_polarizations,
     has_up_to_two_polarizations,
     is_power_of_2,
+    power_dbm_to_lin,
     row_size,
     samples_squared,
     signal_power,
@@ -185,3 +186,18 @@ class DropPolarization(Channel):
         assert has_two_polarizations(symbols)
 
         return symbols[0]
+
+
+class SetPower(Channel):
+    def __init__(self, power_dBm: float) -> None:
+        super().__init__()
+
+        self.target_power = power_dbm_to_lin(power_dBm)
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_up_to_two_polarizations(symbols)
+
+        input_power = signal_power(symbols)
+        ratio = np.sqrt(self.target_power / input_power)
+
+        return symbols * ratio
