@@ -48,10 +48,8 @@ plt.rcParams.update({"font.size": 14})
 
 CHANNEL_SPS = 16
 RECEIVER_SPS = 2
-# At Eb/N0 = 10 dB, we need around 49 taps at 25 km, 79 taps at 50 km, and 143
-# taps at 100 km. However, we can go up to 2**n - 1 without increasing the
-# overlap-save frame size, which should be strictly better.
-CDC_TAPS = 63
+# We only need 17 taps at 25 km.
+CDC_TAPS = 17
 FIBRE_LENGTH = 25_000  # 25 km
 SPLITTING_POINT = 24_000  # 24 km
 CONSUMERS = 64
