@@ -111,10 +111,16 @@ def demodulate(rx_16qam: NDArray[np.cdouble]) -> float:
     assert rx_input.size == 2 * data_training.size
 
     aeq = AdaptiveEqualizerAlamouti(
-        49, 5e-4, 0.08, Modulator16QAM(), Demodulator16QAM(), data_training, False
+        49,
+        5e-4,
+        0.08,
+        Modulator16QAM(),
+        Demodulator16QAM(),
+        lambda: data_training,
+        False,
     )
 
-    rx_aeq = aeq(rx_input[0::2], rx_input[1::2])
+    rx_aeq = aeq(rx_input)
 
     # Take the last 24_000 symbols; this should avoid edge effects.
     rx_demod = Demodulator16QAM()(rx_aeq[-24_000:])

@@ -1,7 +1,7 @@
 from functools import cache, cached_property
 from itertools import count
 from math import ceil, floor
-from typing import Optional, Type
+from typing import Callable, Optional, Type
 
 import numpy as np
 from numpy.typing import NDArray
@@ -532,7 +532,7 @@ class AdaptiveEqualizerAlamouti(Component):
         mu_p: float,
         modulator: Modulator,
         demodulator: Demodulator,
-        training_symbols: NDArray[np.cdouble],
+        get_training_symbols: Callable[[], NDArray[np.cdouble]],
         instrument: bool = False,
     ) -> None:
         super().__init__()
@@ -549,7 +549,7 @@ class AdaptiveEqualizerAlamouti(Component):
         self.modulator = modulator
         self.demodulator = demodulator
 
-        self.training_symbols = training_symbols
+        self.get_training_symbols = get_training_symbols
 
         # Filter coefficients.
         self.w11 = np.zeros(self.taps, dtype=np.cdouble)
@@ -585,7 +585,7 @@ class AdaptiveEqualizerAlamouti(Component):
         symbols: NDArray[np.cdouble],
     ) -> tuple[NDArray[np.cdouble], NDArray[np.cdouble]]:
         assert has_one_polarization(symbols)
-        assert symbols.size % 2 == 0
+        assert is_even(symbols.size)
 
         # 1:2 Serial to Parallel conversion.
         grouped = symbols.reshape(-1, 2)
@@ -611,6 +611,8 @@ class AdaptiveEqualizerAlamouti(Component):
             self.e_oC_log = np.empty_like(self.p_log)
             self.e_eC_log = np.empty_like(self.p_log)
 
+        training_symbols = self.get_training_symbols()
+
         i: Optional[int] = None
         for i, u_o, u_e in zip(
             count(0, 2),
@@ -632,7 +634,7 @@ class AdaptiveEqualizerAlamouti(Component):
             v_o = u_11 * pC + u_12 * p
             v_e = u_21 * pC + u_22 * p
 
-            d_o, d_e = self.training_symbols[i : i + 2]
+            d_o, d_e = training_symbols[i : i + 2]
 
             # Compute errors.
             e_oC = np.conj(d_o - v_o)
