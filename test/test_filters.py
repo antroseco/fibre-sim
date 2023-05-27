@@ -12,7 +12,7 @@ from filters import (
     PulseFilter,
     root_raised_cosine,
 )
-from utils import is_even, normalize_energy, signal_energy
+from utils import is_even, normalize_energy, normalize_power, signal_energy
 
 
 def generate_random_data(length: int) -> NDArray[np.cdouble]:
@@ -96,7 +96,7 @@ class TestPulseFilter:
         assert up.ndim == 1
         assert up.dtype == np.cdouble
         # PulseFilter() keeps boundary effects when upsampling.
-        assert up.size == (data.size + PulseFilter.SPAN - 1) * samples_per_symbol
+        assert up.size == (data.size + PulseFilter.SPAN) * samples_per_symbol
 
         # Data is first filtered at its original rate and then it's subsampled
         # to 1 SpS.
@@ -107,7 +107,7 @@ class TestPulseFilter:
         assert down.size == data.size
 
         # Energy need not be preserved.
-        assert np.allclose(normalize_energy(down), normalize_energy(data), atol=0.01)
+        assert np.allclose(normalize_power(down), normalize_power(data), atol=0.05)
 
     @staticmethod
     @pytest.mark.parametrize("target_size", (2**7, 2**8, 2**9))

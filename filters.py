@@ -33,8 +33,6 @@ class PulseFilter(Component):
     # A span of 32 is quite long for high values of beta (approaching 1),
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
-    # FIXME span needs to be odd to ensure that 2^n - SPAN - 1 is even, as
-    # Alamouti coding operates over pairs of symbols.
     SPAN: int = 70
     BETA: float = 0.021
 
@@ -98,7 +96,7 @@ class PulseFilter(Component):
         assert symbols.size > 0
 
         # This is quite fast actually (https://stackoverflow.com/a/73994667).
-        upsampled = np.zeros(symbols.size * self.up - (self.up - 1), dtype=np.cdouble)
+        upsampled = np.zeros(symbols.size * self.up, dtype=np.cdouble)
         upsampled[:: self.up] = symbols
 
         return upsampled
@@ -120,7 +118,7 @@ class PulseFilter(Component):
             symbols = self.upsample(symbols)
 
         # Filter the data with the impulse response of the filter.
-        filtered = overlap_save(self.impulse_response, symbols, full=True)
+        filtered = overlap_save(self.impulse_response, symbols, True, 1)
 
         if self.down:
             # Should subsample after filtering to avoid aliasing.
@@ -128,14 +126,14 @@ class PulseFilter(Component):
             new_sps = self.samples_per_symbol // self.down
 
             # Remove RRC filter edge effects.
-            return filtered[self.SPAN * new_sps : -(self.SPAN - 1) * new_sps]
+            return filtered[self.SPAN * new_sps : -self.SPAN * new_sps]
 
         # Transmit the symbols as is.
         return filtered
 
     @classmethod
     def symbols_for_total_length(cls, total_length: int) -> int:
-        return total_length - cls.SPAN + 1
+        return total_length - cls.SPAN
 
 
 def root_raised_cosine(
