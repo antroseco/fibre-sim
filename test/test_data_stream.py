@@ -48,6 +48,7 @@ class TestPseudoRandomStream:
         stream.validate(data)
 
         assert stream.bit_errors == 0
+        assert stream.ber == 0
 
         # It should throw if validate() is called consecutively.
         with pytest.raises(Exception):
@@ -63,6 +64,7 @@ class TestPseudoRandomStream:
         stream.validate(np.asarray((0, 0, 1, 1), dtype=np.bool_))
 
         assert stream.bit_errors == 2
+        assert stream.ber == 2 / (LENGTH + 4)
 
     def test_different_lengths(self):
         stream = PseudoRandomStream()

@@ -134,11 +134,11 @@ class TestIntegration:
         )
         system = build_system(PseudoRandomStream(), config)
 
-        bit_errors = system(LENGTH)
+        simulation_ber = system(LENGTH)
 
         # Check with the theoretical rate.
         theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
-        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+        assert np.isclose(simulation_ber, theoretical_ber, rtol=0.05)
 
         # All symbols should have unit energy.
         assert np.isclose(self.energy_sensor.mean, 1)
@@ -155,12 +155,12 @@ class TestIntegration:
         )
         system = build_system(PseudoRandomStream(), config)
 
-        bit_errors = system(LENGTH)
+        simulation_ber = system(LENGTH)
 
         # Check with the theoretical rate.
         # QPSK bit error rate is equal to the BPSK bit error rate.
         theoretical_ber = calculate_awgn_ber_with_bpsk(np.asarray(eb_n0))
-        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+        assert np.isclose(simulation_ber, theoretical_ber, rtol=0.05)
 
         # All symbols should have unit energy.
         assert np.isclose(self.energy_sensor.mean, 1)
@@ -177,12 +177,12 @@ class TestIntegration:
         )
         system = build_system(PseudoRandomStream(), config)
 
-        bit_errors = system(LENGTH)
+        simulation_ber = system(LENGTH)
 
         # Check with the theoretical rate.
         theoretical_ser = calculate_awgn_ser_with_qam(16, np.asarray(eb_n0))
         theoretical_ber = theoretical_ser / 4
-        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+        assert np.isclose(simulation_ber, theoretical_ber, rtol=0.05)
 
         # All symbols should have unit energy.
         assert np.isclose(self.energy_sensor.mean, 1, atol=2e-3)
@@ -205,9 +205,9 @@ class TestIntegration:
         )
         system = build_system(PseudoRandomStream(), config)
 
-        bit_errors = system(LENGTH)
+        simulation_ber = system(LENGTH)
 
         # Check with the theoretical rate.
         theoretical_ser = calculate_awgn_ser_with_qam(16, np.asarray(eb_n0))
         theoretical_ber = theoretical_ser / 4
-        assert np.isclose(bit_errors / LENGTH, theoretical_ber, rtol=0.05)
+        assert np.isclose(simulation_ber, theoretical_ber, rtol=0.05)

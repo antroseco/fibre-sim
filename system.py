@@ -105,7 +105,7 @@ def build_system(
     data_stream: DataStream,
     components: Sequence[Component],
     inspector: Optional[Callable[[str, NDArray], None]] = None,
-) -> Callable[[int], int]:
+) -> Callable[[int], float]:
     typecheck_system(data_stream, components)
 
     has_pf = check_pulse_filters(components)
@@ -125,7 +125,7 @@ def build_system(
 
         return y
 
-    def simulate_system(bit_count: int) -> int:
+    def simulate_system(bit_count: int) -> float:
         assert bit_count >= MIN_CHUNK_SIZE
 
         # If we don't reset the data stream, we'll count errors from a previous
@@ -151,6 +151,6 @@ def build_system(
 
             bit_count -= chunk_size
 
-        return data_stream.bit_errors
+        return data_stream.ber
 
     return simulate_system

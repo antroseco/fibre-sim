@@ -84,7 +84,7 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
     # power of 2.
     assert is_power_of_2(length)
 
-    return build_system(PseudoRandomStream(), system)(length) / length
+    return build_system(PseudoRandomStream(), system)(length)
 
 
 def awgn_link(es_n0: float) -> Sequence[Component]:
@@ -410,7 +410,7 @@ def plot_rrc() -> None:
             ),
         )
 
-        bers.append(system(LENGTH) / LENGTH)
+        bers.append(system(LENGTH))
 
     axs[0].plot(SPANS, bers, alpha=0.6, label="Simulated", marker="o")
 
@@ -516,7 +516,7 @@ def plot_cd_ber_comparison() -> None:
                     ),
                 )
 
-                bers.append(system(LENGTH) / LENGTH)
+                bers.append(system(LENGTH))
 
             ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
 
@@ -579,7 +579,7 @@ def plot_dd_phase_recovery_buffer_size() -> None:
         ]
 
         system = build_system(PseudoRandomStream(), link)
-        bers.append(system(LENGTH) / LENGTH)
+        bers.append(system(LENGTH))
 
     _, axs = plt.subplots(ncols=2)
 
@@ -638,7 +638,7 @@ def plot_step_size_comparison() -> None:
     bers = []
     for h in hs:
         channel.h = h
-        bers.append(system(LENGTH) / LENGTH)
+        bers.append(system(LENGTH))
 
     fig, ax = plt.subplots()
 
