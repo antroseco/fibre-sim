@@ -66,6 +66,19 @@ class Component(TypeChecked):
         pass
 
 
+class NormalizePower(Component):
+    @property
+    def input_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    @property
+    def output_type(self) -> tuple[Signal, Type, Optional[int]]:
+        return Signal.SYMBOLS, np.cdouble, None
+
+    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        return normalize_power(symbols)
+
+
 def plot_signal(component: str, signal: NDArray) -> None:
     assert signal.ndim == 1
     assert signal.size > 0

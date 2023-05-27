@@ -12,7 +12,6 @@ from utils import (
     has_two_polarizations,
     has_up_to_two_polarizations,
     is_power_of_2,
-    normalize_power,
     power_dbm_to_lin,
     row_size,
     samples_squared,
@@ -202,8 +201,3 @@ class SetPower(Channel):
         ratio = np.sqrt(self.target_power / input_power)
 
         return symbols * ratio
-
-
-class NormalizePower(Channel):
-    def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
-        return normalize_power(symbols)
