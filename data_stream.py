@@ -39,8 +39,10 @@ class DataStream(TypeChecked):
 
 
 class PseudoRandomStream(DataStream):
-    def __init__(self) -> None:
+    def __init__(self, ignore_first: bool = False) -> None:
         super().__init__()
+
+        self.ignore_next = ignore_first
 
         self.last_chunk: Optional[NDArray[np.bool_]] = None
         self.rng = np.random.default_rng()
@@ -55,6 +57,10 @@ class PseudoRandomStream(DataStream):
     def validate(self, data: NDArray[np.bool_]) -> None:
         assert self.last_chunk is not None
         assert data.size == self.last_chunk.size
+
+        if self.ignore_next:
+            self.ignore_next = False
+            return
 
         self.bit_errors += np.count_nonzero(data ^ self.last_chunk)
         self.bits_validated += data.size
