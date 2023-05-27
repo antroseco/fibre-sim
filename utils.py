@@ -212,7 +212,9 @@ def optimum_overlap_save_frame_size(h_size: int) -> int:
     return prev_N if cost(prev_N) <= cost(next_N) else next_N
 
 
-def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdouble]:
+def overlap_save(
+    h: NDArray, x: NDArray, full: bool = False, trailing_padding: int = 0
+) -> NDArray[np.cdouble]:
     # Ensure neither array is empty.
     assert h.ndim == 1
     assert h.size >= 1
@@ -238,7 +240,7 @@ def overlap_save(h: NDArray, x: NDArray, full: bool = False) -> NDArray[np.cdoub
         x = np.pad(x, (0, M))
 
     # Output array.
-    y = np.zeros_like(x, dtype=np.cdouble)
+    y = np.zeros(x.size + trailing_padding, dtype=np.cdouble)
 
     # Overlap cache; initially zero.
     last_m = np.zeros(M)
