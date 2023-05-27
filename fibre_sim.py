@@ -9,10 +9,18 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 
-from channel import AWGN, Splitter, SSFChannel
+from channel import (
+    AWGN,
+    DropPolarization,
+    PolarizationRotation,
+    SetPower,
+    Splitter,
+    SSFChannel,
+)
 from data_stream import PseudoRandomStream
 from filters import (
     AdaptiveEqualizer,
+    AdaptiveEqualizerAlamouti,
     CDCompensator,
     ChromaticDispersion,
     Decimate,
@@ -20,10 +28,12 @@ from filters import (
 )
 from laser import ContinuousWaveLaser, NoisyLaser
 from modulation import (
+    AlamoutiEncoder,
     Demodulator,
     Demodulator16QAM,
     DemodulatorBPSK,
     DemodulatorQPSK,
+    DPModulator,
     IQModulator,
     Modulator,
     Modulator16QAM,
@@ -31,17 +41,22 @@ from modulation import (
     ModulatorQPSK,
 )
 from phase_recovery import DecisionDirected
-from receiver import NoisyOpticalFrontEnd, OpticalFrontEnd
+from receiver import (
+    Digital90degHybrid,
+    HeterodyneFrontEnd,
+    NoisyOpticalFrontEnd,
+    OpticalFrontEnd,
+)
 from system import build_system
 from utils import (
     Component,
+    NormalizePower,
     calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
     energy_db_to_lin,
     is_power_of_2,
     next_power_of_2,
     plot_filter,
-    plot_signal,
 )
 
 plt.rcParams.update({"font.size": 14})
@@ -138,6 +153,63 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     )
 
 
+def experiment_link(rx_power_dbm: float) -> Sequence[Component]:
+    # TODO PulseFilter parameters.
+    # TODO running with the noise-less HeterodyneFrontEnd, there seems to be a
+    # noise floor just under 1e-3. Is that due to phase noise? Removing phase
+    # noise drops it to 1e-4 I think.
+    return (
+        AlamoutiEncoder(),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        DPModulator(NoisyLaser(0, SYMBOL_RATE * CHANNEL_SPS)),
+        SetPower(11.5),
+        SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
+        SetPower(rx_power_dbm),
+        PolarizationRotation(),
+        DropPolarization(),
+        HeterodyneFrontEnd(26, SYMBOL_RATE * CHANNEL_SPS),  # TODO noise?
+        Decimate(CHANNEL_SPS // (2 * RECEIVER_SPS)),
+        Digital90degHybrid(
+            26, SYMBOL_RATE * 2 * RECEIVER_SPS
+        ),  # 4 SpS to avoid aliasing.
+        Decimate(2),  # Down to 2 SpS now.
+        # CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        PulseFilter(RECEIVER_SPS, down=1),
+    )
+
+
+def make_experiment_simulation(
+    modulator: Type[Modulator],
+    demodulator: Type[Demodulator],
+    length: int,
+    rx_power_dbm: float,
+) -> float:
+    data_stream = PseudoRandomStream(ignore_first=True)
+
+    def get_training_symbols() -> NDArray[np.cdouble]:
+        # Need to return up-to-date symbols on each iteration.
+        assert data_stream.last_chunk is not None
+        return modulator()(data_stream.last_chunk)
+
+    system = (
+        modulator(),
+        *experiment_link(rx_power_dbm),
+        NormalizePower(),  # Match incoming data with training data.
+        AdaptiveEqualizerAlamouti(
+            21,
+            1e-3,
+            0.2,  # Adjust paremeters.
+            modulator(),
+            demodulator(),
+            get_training_symbols,
+            False,
+        ),
+        demodulator(),
+    )
+
+    return build_system(data_stream, system)(length)
+
+
 def make_nonlinear_simulation(
     modulator: Type[Modulator],
     demodulator: Type[Demodulator],
@@ -205,6 +277,23 @@ def run_nonlinear_simulation(
         else map(simulation, lengths, tx_power_dbms)
     )
     return tx_power_dbms, bers
+
+
+def run_experiment_simulation(
+    p_executor: Optional[ProcessPoolExecutor],
+    simulation: Callable[[int, float], float],
+) -> tuple[NDArray[np.float64], list[float]]:
+    LENGTH = PulseFilter.symbols_for_total_length(2**18)
+
+    rx_power_dbms = np.arange(-25, -18, dtype=np.float64)
+    lengths = cycle((LENGTH,))
+
+    bers = list(
+        p_executor.map(simulation, lengths, rx_power_dbms)
+        if p_executor
+        else map(simulation, lengths, rx_power_dbms)
+    )
+    return rx_power_dbms, bers
 
 
 def plot_cd_compensation_fir() -> None:
@@ -368,6 +457,38 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     ax.set_ylabel("BER")
     # TODO use the power going into the fibre (after the I/Q Modulator).
     ax.set_xlabel("Power at modulator input (dBm)")
+    ax.legend()
+
+    plt.show()
+
+
+def plot_experiment_simulations(concurrent: bool = True) -> None:
+    _, ax = plt.subplots()
+
+    markers = cycle(("o", "x", "s", "*"))
+    labels = ("Simulated 16-QAM",)
+    simulations = (
+        partial(make_experiment_simulation, Modulator16QAM, Demodulator16QAM),
+    )
+
+    if concurrent:
+        with (
+            ProcessPoolExecutor(max_workers=PHYSICAL_CORES) as p_executor,
+            ThreadPoolExecutor(max_workers=len(simulations)) as t_executor,
+        ):
+            fn = partial(run_experiment_simulation, p_executor)
+            sim_results = t_executor.map(fn, simulations)
+    else:
+        fn = partial(run_experiment_simulation, None)
+        sim_results = map(fn, simulations)
+
+    for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
+        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+
+    ax.set_ylim(TARGET_BER / 4)
+    ax.set_yscale("log")
+    ax.set_ylabel("BER")
+    ax.set_xlabel("Received power [dBm]")
     ax.legend()
 
     plt.show()
@@ -723,4 +844,4 @@ def plot_adaptive_equalizer_comparison() -> None:
 
 
 if __name__ == "__main__":
-    plot_nonlinear_simulations()
+    plot_experiment_simulations()
