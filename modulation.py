@@ -317,6 +317,8 @@ class AlamoutiEncoder(Component):
 
     def __call__(self, data: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         assert has_one_polarization(data)
+        # NOTE symbols must come in pairs.
+        assert is_even(data.size)
 
         pol_x = np.empty_like(data)
         pol_y = np.empty_like(data)
