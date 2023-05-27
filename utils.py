@@ -451,6 +451,27 @@ def plot_filter(fir_filter: NDArray[np.cdouble]) -> None:
     plt.show()
 
 
+def plot_filter_with_gd(fir_filter: NDArray[np.cdouble]) -> None:
+    fig, ax1 = plt.subplots()
+
+    w, h = signal.freqz(fir_filter)
+
+    ax1.set_title("Digital filter frequency response")
+    ax1.plot(w, 20 * np.log10(abs(h)), "C0")
+    ax1.set_ylabel("Amplitude [dB]", color="C0")
+    ax1.set_xlabel("Frequency [rad/sample]")
+
+    w, gd = signal.group_delay((fir_filter, 1))
+
+    ax2 = ax1.twinx()
+    ax2.plot(w, gd, "C1")
+    ax2.set_ylabel("Group delay [samples]", color="C1")
+    ax2.axis("tight")
+
+    fig.tight_layout()
+    plt.show()
+
+
 def convmtx(
     data: NDArray[Any],
     filter_length: int,
