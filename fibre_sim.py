@@ -877,5 +877,20 @@ def plot_phase_noise() -> None:
     simulate_impl(link, 2**15)
 
 
+def plot_phase_noise_sample() -> None:
+    nl = NoisyLaser(0, 100e9)
+    xs = np.arange(2048) / 100
+
+    for _ in range(4):
+        nl.sample_phase_noise(2048)
+        plt.plot(xs, nl.last_noise)
+
+    plt.title(r"Phase noise samples, $\Delta\nu = 100$ kHz")
+    plt.ylabel("Phase noise [rad]")
+    plt.xlabel("Time [ns]")
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
-    plot_phase_noise()
+    plot_phase_noise_sample()
