@@ -51,6 +51,7 @@ from system import build_system
 from utils import (
     Component,
     NormalizePower,
+    Signal,
     calculate_awgn_ber_with_16qam,
     calculate_awgn_ber_with_bpsk,
     energy_db_to_lin,
@@ -105,9 +106,7 @@ def simulate_impl(system: Sequence[Component], length: int) -> float:
 def awgn_link(es_n0: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(
-            NoisyLaser(10, SYMBOL_RATE * CHANNEL_SPS)
-        ),  # Maximum power for a Class 1 laser.
+        IQModulator(NoisyLaser(10, SYMBOL_RATE * CHANNEL_SPS)),
         ChromaticDispersion(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS),
         OpticalFrontEnd(),
         Decimate(CHANNEL_SPS // RECEIVER_SPS),
@@ -843,5 +842,40 @@ def plot_adaptive_equalizer_comparison() -> None:
     plt.show()
 
 
+def plot_phase_noise() -> None:
+    class Plotter(Component):
+        @property
+        def input_type(self) -> tuple[Signal, Type, int | None]:
+            return Signal.SYMBOLS, np.cdouble, None
+
+        @property
+        def output_type(self) -> tuple[Signal, Type, int | None]:
+            return Signal.SYMBOLS, np.cdouble, None
+
+        def __call__(self, symbols: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+            plt.scatter(np.real(symbols), np.imag(symbols), s=0.1)
+            plt.xlabel("In-phase")
+            plt.ylabel("Quadrature")
+            plt.title("16-QAM constellation corrupted by phase noise")
+            plt.show()
+
+            return symbols
+
+    link = (
+        Modulator16QAM(),
+        PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
+        IQModulator(NoisyLaser(10, SYMBOL_RATE * CHANNEL_SPS)),
+        OpticalFrontEnd(),
+        Decimate(CHANNEL_SPS // RECEIVER_SPS),
+        AWGN(energy_db_to_lin(40), RECEIVER_SPS),  # Very mild AWGN.
+        PulseFilter(RECEIVER_SPS, down=RECEIVER_SPS),
+        NormalizePower(),
+        Plotter(),
+        Demodulator16QAM(),
+    )
+
+    simulate_impl(link, 2**15)
+
+
 if __name__ == "__main__":
-    plot_experiment_simulations()
+    plot_phase_noise()
