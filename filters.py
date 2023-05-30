@@ -186,7 +186,7 @@ def root_raised_cosine(
     # Normalize energy. The taps generated have energy 0.5, but only if the span
     # is infinite. Since we truncate the filter, we need to re-normalize the
     # remaining terms.
-    return normalize_power(full)
+    return normalize_energy(full)
 
 
 class CDBase(Component):

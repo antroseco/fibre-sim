@@ -184,7 +184,7 @@ class TestChromaticDispersion:
     @staticmethod
     @pytest.mark.parametrize("taps", (5, 41, 101))
     def test_d_against_matlab(taps: int) -> None:
-        cdc = CDCompensator(25_000, 100e9, 2, taps)
+        cdc = CDCompensator(25_000, 100e9, 2, taps, 0.021)
 
         expected = scipy.io.loadmat(f"test/matlab_cdc_{taps}_taps.mat")["ans"]
 
