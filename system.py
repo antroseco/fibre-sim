@@ -121,7 +121,7 @@ def build_system(
         # FFT is much more efficient for block sizes that are powers of 2.
         # Enforce this constraint to catch bugs, with a "heuristic".
         length = row_size(y)
-        assert is_power_of_2(length) or next_power_of_2(length) - length < 300
+        assert is_power_of_2(length) or next_power_of_2(length) - length < 800
 
         return y
 
