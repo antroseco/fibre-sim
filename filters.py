@@ -33,8 +33,8 @@ class PulseFilter(Component):
     # A span of 32 is quite long for high values of beta (approaching 1),
     # but it's way too short for smaller betas. 128 would be a more
     # appropriate value for betas approaching 0.
-    SPAN: int = 70
-    BETA: float = 0.021
+    SPAN: int = 120
+    BETA: float = 0.01
 
     def __init__(
         self,
@@ -186,7 +186,7 @@ def root_raised_cosine(
     # Normalize energy. The taps generated have energy 0.5, but only if the span
     # is infinite. Since we truncate the filter, we need to re-normalize the
     # remaining terms.
-    return normalize_energy(full)
+    return normalize_power(full)
 
 
 class CDBase(Component):
