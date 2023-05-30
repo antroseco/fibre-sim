@@ -43,7 +43,7 @@ from modulation import (
 from phase_recovery import DecisionDirected
 from receiver import (
     Digital90degHybrid,
-    HeterodyneFrontEnd,
+    NoisyHeterodyneFrontEnd,
     NoisyOpticalFrontEnd,
     OpticalFrontEnd,
 )
@@ -154,7 +154,6 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
 
 
 def experiment_link(rx_power_dbm: float) -> Sequence[Component]:
-    # TODO PulseFilter parameters.
     # TODO running with the noise-less HeterodyneFrontEnd, there seems to be a
     # noise floor just under 1e-3. Is that due to phase noise? Removing phase
     # noise drops it to 1e-4 I think.
@@ -167,7 +166,7 @@ def experiment_link(rx_power_dbm: float) -> Sequence[Component]:
         SetPower(rx_power_dbm),
         PolarizationRotation(),
         DropPolarization(),
-        HeterodyneFrontEnd(26, SYMBOL_RATE * CHANNEL_SPS),  # TODO noise?
+        NoisyHeterodyneFrontEnd(26, SYMBOL_RATE * CHANNEL_SPS),
         Decimate(CHANNEL_SPS // (2 * RECEIVER_SPS)),
         Digital90degHybrid(
             26, SYMBOL_RATE * 2 * RECEIVER_SPS
@@ -485,12 +484,21 @@ def plot_experiment_simulations(concurrent: bool = True) -> None:
         sim_results = map(fn, simulations)
 
     for label, marker, (eb_n0_dbs, bers) in zip(labels, markers, sim_results):
-        ax.plot(eb_n0_dbs, bers, alpha=0.6, label=label, marker=marker)
+        ax.plot(eb_n0_dbs, np.log10(bers), alpha=0.6, label=label, marker=marker)
 
-    ax.set_ylim(TARGET_BER / 4)
-    ax.set_yscale("log")
+    orig_lims = ax.get_xlim()
+    ax.hlines(-2, *orig_lims, label="FEC limit", alpha=0.4, linewidth=4)
+    ax.set_xlim(orig_lims)
+
+    # BER should be a straight line on a semi-log plot.
+    ax.set_yscale("symlog", linthresh=0.1)
+    yticks = np.arange(-2.6, -1.6, 0.2)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(map("{:.1f}".format, yticks))
+
     ax.set_ylabel("BER")
     ax.set_xlabel("Received power [dBm]")
+    ax.set_title("16-QAM, 50 GBd, 25 km")
     ax.legend()
 
     plt.show()
@@ -898,4 +906,4 @@ def plot_phase_noise_sample() -> None:
 
 
 if __name__ == "__main__":
-    plot_phase_noise_sample()
+    plot_experiment_simulations()
