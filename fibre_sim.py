@@ -141,7 +141,8 @@ def make_awgn_simulation(
 def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
     return (
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
-        IQModulator(NoisyLaser(tx_power_dbm, SYMBOL_RATE * CHANNEL_SPS)),
+        IQModulator(NoisyLaser(0, SYMBOL_RATE * CHANNEL_SPS)),
+        SetPower(tx_power_dbm),
         SSFChannel(SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
         Splitter(CONSUMERS),
         SSFChannel(FIBRE_LENGTH - SPLITTING_POINT, SYMBOL_RATE * CHANNEL_SPS),
@@ -235,7 +236,7 @@ def run_awgn_simulation(
     ber_function: Callable[[NDArray[np.float64]], NDArray[np.float64]],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.int64], list[float]]:
-    MAX_LENGTH = 2**24  # 16,777,216
+    MAX_LENGTH = 2**18
     MAX_EB_N0_DB = 12
 
     eb_n0_dbs = np.arange(1, MAX_EB_N0_DB + 1)
@@ -263,7 +264,7 @@ def run_nonlinear_simulation(
     p_executor: Optional[ProcessPoolExecutor],
     simulation: Callable[[int, float], float],
 ) -> tuple[NDArray[np.float64], list[float]]:
-    LENGTH = 2**16  # 65,536
+    LENGTH = 2**18
 
     tx_power_dbms = np.linspace(-10, 15, 8, endpoint=True)
     lengths = cycle((LENGTH,))
@@ -381,7 +382,7 @@ def plot_cd_compensation_freq_response() -> None:
 
 
 def plot_awgn_simulations(concurrent: bool = True) -> None:
-    _, ax = plt.subplots()
+    fig, ax = plt.subplots()
 
     markers = cycle(("o", "x", "s", "*"))
     labels = ("Simulated BPSK", "Simulated QPSK", "Simulated 16-QAM")
@@ -423,7 +424,10 @@ def plot_awgn_simulations(concurrent: bool = True) -> None:
     ax.set_yscale("log")
     ax.set_ylabel("BER")
     ax.set_xlabel("$E_b/N_0$ (dB)")
+    ax.set_title("50 GBd, 25 km")
     ax.legend()
+
+    fig.tight_layout()
 
     plt.show()
 
@@ -454,8 +458,7 @@ def plot_nonlinear_simulations(concurrent: bool = True) -> None:
     ax.set_ylim(TARGET_BER / 4)
     ax.set_yscale("log")
     ax.set_ylabel("BER")
-    # TODO use the power going into the fibre (after the I/Q Modulator).
-    ax.set_xlabel("Power at modulator input (dBm)")
+    ax.set_xlabel("Launch power [dBm]")
     ax.legend()
 
     plt.show()
@@ -497,8 +500,8 @@ def plot_rrc() -> None:
     SPS = 2
     EB_N0_dB = 10
     EB_N0 = energy_db_to_lin(EB_N0_dB)
-    SPANS = list(range(2, 100, 4))
-    BETA = 0.021
+    SPANS = np.arange(2, 132, 4)
+    BETA = 0.01
     LENGTH = 2**21
 
     fig, axs = plt.subplots(nrows=2)
@@ -536,7 +539,7 @@ def plot_rrc() -> None:
 
     axs[0].set_yscale("log")
     axs[0].set_ylabel("BER")
-    axs[0].set_xlabel("RRC Span (in symbols)")
+    axs[0].set_xlabel("RRC Span [in symbols]")
     axs[0].legend()
 
     # Plot the frequency spectrum at the given β.
@@ -547,9 +550,11 @@ def plot_rrc() -> None:
         pf.impulse_response.tolist(),
         SYMBOL_RATE * SPS / 1e9,
         sides="twosided",
+        scale="dB",
     )
 
-    axs[1].set_xlabel("Frequency (GHz)")
+    axs[1].set_xlabel("Frequency [GHz]")
+    axs[1].set_ylabel("Magnitude [dB]")
 
     fig.suptitle(
         f"$E_b/N_0 = {EB_N0_dB}$ dB, $\\beta = {BETA}$, "
@@ -732,9 +737,9 @@ def plot_dd_phase_recovery_buffer_size() -> None:
 
 def plot_step_size_comparison() -> None:
     LENGTH = 2**16
-    TX_POWER_dBm = 17
+    TX_POWER_dBm = 25
 
-    hs = [10, 25, 50, 100, 250, 500, 1000, 2000, FIBRE_LENGTH]
+    hs = [50, 100, 250, 500, 1000, 2000, FIBRE_LENGTH]
 
     channel = SSFChannel(FIBRE_LENGTH, SYMBOL_RATE * CHANNEL_SPS)
 
