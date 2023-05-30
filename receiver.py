@@ -16,7 +16,7 @@ from utils import (
 
 
 class OpticalFrontEnd(Component):
-    lo_power = power_dbm_to_lin(10)  # 10 dBm is the max for Class 1 lasers.
+    lo_power = power_dbm_to_lin(16)
     lo_amplitude = np.sqrt(2 * lo_power)  # Signal power to peak amplitude.
 
     @property
@@ -29,16 +29,7 @@ class OpticalFrontEnd(Component):
 
     @cached_property
     def responsivity(self) -> float:
-        # Responsivity is around 0.688 A/W. This seems like a reasonable value;
-        # photodetectors with greater responsivities have been demonstrated
-        # (e.g. Young-Ho Ko, Joong-Seon Choe, Won Seok Han, Seo-Young Lee,
-        # Young-Tak Han, Hyun-Do Jung, Chun Ju Youn, Jong-Hoi Kim, and Yongsoon
-        # Baek, "High-speed waveguide photodetector for 64 Gbaud coherent
-        # receiver," Opt. Lett. 43, 579-582 (2018) measured 0.73 A/W).
-        efficiency = 0.55
-        return (
-            efficiency * elementary_charge * self.WAVELENGTH / (Planck * speed_of_light)
-        )
+        return 0.45  # A/W, for the Finisar BPDV3120R balanced photodetector.
 
     def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
         # These are simple scalar multiplications.
@@ -148,3 +139,67 @@ class NoisyOpticalFrontEnd(OpticalFrontEnd):
 
         # Convert current to voltage.
         return current * R_LOAD
+
+
+class NoisyHeterodyneFrontEnd(OpticalFrontEnd):
+    def __init__(
+        self, if_ghz: float, sampling_rate: float, linewidth: float = 200e3
+    ) -> None:
+        super().__init__()
+
+        assert if_ghz > 0
+        self.if_omega = 2 * np.pi * if_ghz * 1e9
+
+        assert sampling_rate > 0
+        self.sampling_rate = sampling_rate
+        self.sampling_interval = 1 / sampling_rate
+
+        self.laser = NoisyLaser(0, sampling_rate, linewidth)
+        self.rng = np.random.default_rng()
+
+        # 50 Ω load resistor (common value).
+        self.R_LOAD = 50
+
+    @property
+    def last_phase_noise(self) -> NDArray[np.float64]:
+        assert self.laser.last_noise is not None
+        return self.laser.last_noise
+
+    def generate_awgn_noise(self, size: int) -> NDArray[np.float64]:
+        # Take the noise bandwidth as the Nyquist frequency.
+        B_N = self.sampling_rate / 2
+
+        # σ2 = 2*e*r*B_N where r is the photocurrent (approximately R*P_LO).
+        shot_noise_var = 2 * elementary_charge * self.responsivity * self.lo_power * B_N
+
+        # Thermal noise has σ2 = 4*k_B*T*B_N/R_L.
+        thermal_noise_var = 4 * Boltzmann * 293 * B_N / self.R_LOAD
+
+        # Shot noise and thermal noise are independent, so their variances add.
+        noise_stdev = np.sqrt(shot_noise_var + thermal_noise_var)
+
+        return self.rng.normal(0, noise_stdev, size=size)
+
+    def __call__(self, Efields: NDArray[np.cdouble]) -> NDArray[np.cdouble]:
+        assert has_one_polarization(Efields)
+
+        if_term = (self.if_omega * self.sampling_interval) * np.arange(Efields.size)
+
+        self.laser.sample_phase_noise(Efields.size)
+
+        angular_term = if_term - self.last_phase_noise
+
+        current = (
+            2
+            * self.responsivity
+            * self.lo_amplitude
+            * (
+                np.real(Efields) * np.sin(angular_term)
+                + np.imag(Efields) * np.cos(angular_term)
+            )
+        )
+
+        current += self.generate_awgn_noise(current.size)
+
+        # Convert current to voltage and cast to cdouble for consistency.
+        return (current * self.R_LOAD).astype(np.cdouble)
