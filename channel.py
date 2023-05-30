@@ -70,7 +70,7 @@ class AWGN(Channel):
 
 
 class SSFChannel(Channel):
-    h = 1000  # m
+    h = 250  # m
 
     def __init__(self, fibre_length: int, sampling_rate: float) -> None:
         super().__init__()
