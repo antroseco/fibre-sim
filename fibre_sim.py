@@ -154,9 +154,6 @@ def nonlinear_link(tx_power_dbm: float) -> Sequence[Component]:
 
 
 def experiment_link(rx_power_dbm: float) -> Sequence[Component]:
-    # TODO running with the noise-less HeterodyneFrontEnd, there seems to be a
-    # noise floor just under 1e-3. Is that due to phase noise? Removing phase
-    # noise drops it to 1e-4 I think.
     return (
         AlamoutiEncoder(),
         PulseFilter(CHANNEL_SPS, up=CHANNEL_SPS),
@@ -172,7 +169,7 @@ def experiment_link(rx_power_dbm: float) -> Sequence[Component]:
             26, SYMBOL_RATE * 2 * RECEIVER_SPS
         ),  # 4 SpS to avoid aliasing.
         Decimate(2),  # Down to 2 SpS now.
-        # CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
+        CDCompensator(FIBRE_LENGTH, SYMBOL_RATE * RECEIVER_SPS, RECEIVER_SPS, CDC_TAPS),
         PulseFilter(RECEIVER_SPS, down=1),
     )
 
@@ -284,7 +281,7 @@ def run_experiment_simulation(
 ) -> tuple[NDArray[np.float64], list[float]]:
     LENGTH = PulseFilter.symbols_for_total_length(2**18)
 
-    rx_power_dbms = np.arange(-25, -18, dtype=np.float64)
+    rx_power_dbms = np.arange(-33, -26, dtype=np.float64)
     lengths = cycle((LENGTH,))
 
     bers = list(
@@ -489,12 +486,6 @@ def plot_experiment_simulations(concurrent: bool = True) -> None:
     orig_lims = ax.get_xlim()
     ax.hlines(-2, *orig_lims, label="FEC limit", alpha=0.4, linewidth=4)
     ax.set_xlim(orig_lims)
-
-    # BER should be a straight line on a semi-log plot.
-    ax.set_yscale("symlog", linthresh=0.1)
-    yticks = np.arange(-2.6, -1.6, 0.2)
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(map("{:.1f}".format, yticks))
 
     ax.set_ylabel("BER")
     ax.set_xlabel("Received power [dBm]")
