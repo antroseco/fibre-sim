@@ -5,11 +5,12 @@ from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy import io as sio
 from scipy import signal
+from scipy.optimize import OptimizeResult, minimize_scalar
 
 from filters import AdaptiveEqualizerAlamouti, CDCompensator, PulseFilter
 from modulation import Demodulator16QAM, Modulator16QAM
 from receiver import Digital90degHybrid
-from utils import normalize_power
+from utils import calculate_awgn_ber_with_16qam, normalize_power
 
 plt.rcParams.update({"font.size": 14})
 
@@ -111,7 +112,7 @@ def demodulate(rx_16qam: NDArray[np.cdouble]) -> float:
     assert rx_input.size == 2 * data_training.size
 
     aeq = AdaptiveEqualizerAlamouti(
-        49,
+        149,
         5e-4,
         0.08,
         Modulator16QAM(),
@@ -149,44 +150,60 @@ def process_file(data_path: str) -> float:
     return ber
 
 
+def fit_sensitivity(
+    dbms: NDArray[np.float64], bers_1: NDArray[np.float64], bers_2: NDArray[np.float64]
+) -> float:
+    def cost_fn(offset: float) -> float:
+        pred_bers = calculate_awgn_ber_with_16qam(dbms + offset)
+        cost_1 = np.sum(np.square(bers_1 - pred_bers))
+        cost_2 = np.sum(np.square(bers_2 - pred_bers))
+        return cost_1 + cost_2
+
+    res: OptimizeResult = minimize_scalar(cost_fn, bounds=(25, 35))
+    assert res.success
+
+    return res.x
+
+
 def main() -> None:
     # Have data from -25 dBm to -19 dBm, inclusive.
-    dbms = range(-25, -18)
+    dbms = np.arange(-25, -18, dtype=np.float64)
     bers_1 = np.fromiter(
         map(
-            lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i}dBm.mat"),
+            lambda i: process_file(f"data_bence_paper/capture_50G_run5_{i:.0f}dBm.mat"),
             dbms,
         ),
         np.float64,
     )
     bers_2 = np.fromiter(
         map(
-            lambda i: process_file(f"data_bence_paper/capture_50G_run6_{i}dBm.mat"),
+            lambda i: process_file(f"data_bence_paper/capture_50G_run6_{i:.0f}dBm.mat"),
             dbms,
         ),
         np.float64,
     )
 
-    print(f"***MEAN BER (1) = {np.mean(bers_1):.2e}***")
-    print(f"***MEAN BER (2) = {np.mean(bers_2):.2e}***")
-
     fig, ax = plt.subplots()
 
-    ax.plot(dbms, np.log10(bers_1), label="Run 1", alpha=0.6, linewidth=2, marker="o")
-    ax.plot(dbms, np.log10(bers_2), label="Run 2", alpha=0.6, linewidth=2, marker="s")
+    ax.scatter(dbms, np.log10(bers_1), alpha=0.6, linewidth=2, color="C0")
+    ax.scatter(dbms, np.log10(bers_2), alpha=0.6, linewidth=2, color="C0")
+
+    rx_power_offset = fit_sensitivity(dbms[:5], bers_1[:5], bers_2[:5])
+
+    ax.plot(
+        dbms,
+        np.log10(calculate_awgn_ber_with_16qam(dbms + rx_power_offset)),
+        alpha=0.6,
+        linewidth=4,
+        color="C0",
+    )
 
     orig_lims = ax.get_xlim()
-    ax.hlines(-2, *orig_lims, label="FEC limit", alpha=0.4, linewidth=4)
+    ax.hlines(-2, *orig_lims, label="FEC limit", alpha=0.4, linewidth=4, color="C2")
     ax.set_xlim(orig_lims)
 
     ax.set_xlabel("Received Power [dBm]")
     ax.set_ylabel(r"$\log_{10}$BER")
-
-    # BER should be a straight line on a semi-log plot.
-    ax.set_yscale("symlog", linthresh=0.1)
-    yticks = np.arange(-2.6, -1.6, 0.2)
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(map("{:.1f}".format, yticks))
 
     ax.legend()
     ax.set_title("16-QAM, 50 GBd, 25 km")
